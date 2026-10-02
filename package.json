@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "test": "npm run build && node tools/smoke-test.mjs",
     "test:all": "npm run build && node tools/run_all_tests.mjs",
-    "electron:dev": "vite build && electron .",
+    "electron:dev": "node tools/dev-electron.mjs",
     "electron:pack": "vite build && electron-builder --dir",
     "electron:dist": "vite build && electron-builder",
     "art:optimize": "python tools/art/optimize_assets.py",

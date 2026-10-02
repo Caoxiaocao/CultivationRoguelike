@@ -32,7 +32,7 @@
 # 安装依赖
 npm install
 
-# 启动本地开发调试服务
+# 启动本地开发调试服务（默认 http://127.0.0.1:5173）
 npm run dev
 
 # 运行生产打包
@@ -44,7 +44,7 @@ npm test
 # 运行全量自动化测试套件 (包含 10 个核心系统与机制测试套件)
 npm run test:all
 
-# 启动桌面端 Electron 应用
+# 启动桌面端 Electron 应用（开发模式：自动拉起 dev server，支持热更新）
 npm run electron:dev
 
 # 构建 Windows 安装包与免安装便携版
@@ -55,6 +55,26 @@ npm run art:optimize
 
 # 导入新素材（自动抠底 / 归一化构图 / 切帧 / 打包序列帧）
 npm run art:import -- --in art-source/raw/xxx.jpg --out public/xxx.png --size 256 --anchor bottom
+```
+
+### 端口被占用时（`EACCES: permission denied 127.0.0.1:xxxx`）
+
+Windows 上如果目标端口被别的程序绑定，Vite 会报
+`Error: listen EACCES: permission denied 127.0.0.1:xxxx` —— **看着像权限不足，实际是端口冲突**
+（Windows 对已被占用的地址返回 `WSAEACCES`）。
+
+本项目默认端口是 **5173**（原为 3000，但该端口常年被 Clash Verge 等代理工具占用）。换端口：
+
+```bash
+PORT=4000 npm run dev          # bash / PowerShell 7
+$env:PORT=4000; npm run dev    # Windows PowerShell
+```
+
+排查是谁占用了端口：
+
+```powershell
+Get-NetTCPConnection -LocalPort 5173 -State Listen |
+  ForEach-Object { Get-Process -Id $_.OwningProcess }
 ```
 
 ---
