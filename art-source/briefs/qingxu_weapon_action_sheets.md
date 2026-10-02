@@ -76,6 +76,7 @@
 | 水平位置 | **居中**，左右留白对称（角色本体宽度约 100–140 px） |
 | 特效横向余量 | 帧 3 / 帧 4 的法术特效可横向扩展至接近满宽（x 13–167），但**角色本体尺寸不得变化**，只有手印、飘带与法术特效变化 |
 | 朝向 | **一律朝右**（游戏会按移动方向水平镜像翻转） |
+| 网格内垂直一致性 | 六帧的角色**必须在各自格子里处于同一垂直位置**。实测 AI 出图常出现"整行偏移"（v2 的上排头顶在 y≈26、下排却在 y≈12，相差 14px）。若无法保证，我会用 `tools/art/align_frames.py` 按头顶锚定做后期对齐，不必重出 |
 
 ### 构图模板（可作为叠图参考一并上传）
 
@@ -237,15 +238,14 @@ PNG 带透明通道（或纯白背景）。角色行列顺序：左上→右上�
 
 | 位置 | 现状 | 需改为 |
 | :--- | :--- | :--- |
-| `getPlayerWeaponSheet()` | `if (charId !== 'sword') return null` | 允许 `spell`，并按武器 id 取对应帧集 |
-| `drawPlayerModel()` 内 | `charId === 'sword' && ...` | 放开到 `['sword', 'spell'].includes(charId)` |
-| `playerWeaponSheets` | 只有 3 套剑修帧 | 新增 `spell_bagua` / `spell_fuchen` / `spell_baozhu` 三套并接入装载 |
+| `getPlayerWeaponSheet()` | `if (charId !== 'sword') return null` | ✅ **已改**：先按武器 id/type 查表，未命中时仅剑修回退默认帧，其余职业返回 null |
+| `drawPlayerModel()` 内 | `charId === 'sword' && ...` | ✅ **已改**：去掉职业门控，改由 `getPlayerWeaponSheet` 返回 null 自然回退 |
+| `playerWeaponSheets` | 只有 3 套剑修帧 | ✅ 已加 `spell_bagua`（含 `bagua` 类型别名）；拂尘 / 宝珠待出图后追加 |
 
 配套还需要：
 
-- `tools/test_player_weapon_sheets.mjs:259` 目前断言 **「法修等其他非剑修职业返回 null」** ——
-  这条断言必须同步改写，否则测试会红
-- 新增三套帧的尺寸/基线/透明通道断言，与现有剑修套件的检查项对齐
+- `tools/test_player_weapon_sheets.mjs` 原断言 **「法修等其他非剑修职业返回 null」** ——
+  ✅ **已改写**为「未登记帧集的武器返回 null」，并新增八卦阵盘的尺寸/帧数/匹配断言（该套件 40 → 51 项）
 
 > 单帧绘制尺寸：游戏内以 `drawImage(img, sx, sy, 180, 180, -36, -59.04, 72, 72)` 绘制，
 > 即 **72×72 逻辑像素**（高 DPR 下约 144–180 设备像素）。

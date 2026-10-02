@@ -1233,16 +1233,19 @@ if (!isHeadless) {
   }
 }
 
-// 凌虚子（剑修）三大初始本命法宝专属动作序列帧贴图 (Action Spritesheets)
-// 6 帧动画（3 列 × 2 行，每帧 180×180）：0:待机蓄势, 1:疾步前踏, 2:引剑起手, 3:巅峰斩击, 4:招式破空, 5:收势回招
+// 凌虚子（剑修）与清虚仙子（法修）本命法宝专属动作序列帧贴图 (Action Spritesheets)
+// 6 帧动画（3 列 × 2 行，每帧 180×180）：0:待机蓄势, 1:移步起手, 2:蓄劲引势, 3:招式巅峰, 4:破空余韵, 5:敛息收招
+// 注意：序列帧里只有角色本体与法术光效，法宝本体由 drawFloatingWeapons 单独绘制，两者不可重复
 const playerWeaponSheets = {
   sword_qingfeng: { img: typeof Image !== 'undefined' ? new Image() : null, loaded: false, src: './player_sword_qingfeng_sheet.png', frameW: 180, frameH: 180, cols: 3, rows: 2, totalFrames: 6 },
   sword_jifeng: { img: typeof Image !== 'undefined' ? new Image() : null, loaded: false, src: './player_sword_jifeng_sheet.png', frameW: 180, frameH: 180, cols: 3, rows: 2, totalFrames: 6 },
   sword_benlei: { img: typeof Image !== 'undefined' ? new Image() : null, loaded: false, src: './player_sword_benlei_sheet.png', frameW: 180, frameH: 180, cols: 3, rows: 2, totalFrames: 6 },
+  spell_bagua: { img: typeof Image !== 'undefined' ? new Image() : null, loaded: false, src: './player_spell_bagua_sheet.png', frameW: 180, frameH: 180, cols: 3, rows: 2, totalFrames: 6 },
 }
 playerWeaponSheets['sword'] = playerWeaponSheets.sword_qingfeng
 playerWeaponSheets['daggers'] = playerWeaponSheets.sword_jifeng
 playerWeaponSheets['thunder_sword'] = playerWeaponSheets.sword_benlei
+playerWeaponSheets['bagua'] = playerWeaponSheets.spell_bagua
 
 if (!isHeadless) {
   for (const k in playerWeaponSheets) {
@@ -1257,11 +1260,14 @@ if (!isHeadless) {
 function getPlayerWeaponSheet(p) {
   if (!p) return null
   const charId = p.charId || 'sword'
-  if (charId !== 'sword') return null
   const curWeapon = (game.weapons && game.weapons[0]) || {}
   const wId = p.weaponId || curWeapon.id || ''
   const wType = p.weaponType || curWeapon.weaponType || curWeapon.type || ''
-  return playerWeaponSheets[wId] || playerWeaponSheets[wType] || playerWeaponSheets.sword_qingfeng
+  const sheet = playerWeaponSheets[wId] || playerWeaponSheets[wType]
+  if (sheet) return sheet
+  // 只有剑修在未匹配到时才回退到默认青锋灵剑序列帧（保持既有行为）；
+  // 法修等其余职业没有对应帧集时返回 null，平滑回退到各自专属立绘
+  return charId === 'sword' ? playerWeaponSheets.sword_qingfeng : null
 }
 
 const playerAnimeImg = charSprites.sword.img
@@ -11780,8 +11786,9 @@ function drawPlayerModel(p, elapsed) {
     ? getSpriteSquash(elapsed, isMoving, isAttacking, attackProgress, p.invuln > 0.4 ? (p.invuln - 0.4) : 0)
     : { scaleX: 1, scaleY: 1 }
 
-  // 剑修三大本命法宝专属动作序列帧贴图 (Action Spritesheets)
-  const weaponSheet = (charId === 'sword' && typeof getPlayerWeaponSheet === 'function') ? getPlayerWeaponSheet(p) : null
+  // 剑修 / 法修 的本命法宝专属动作序列帧贴图 (Action Spritesheets)
+  // 其余职业没有帧集时 getPlayerWeaponSheet 返回 null，自动回退到各自专属立绘
+  const weaponSheet = typeof getPlayerWeaponSheet === 'function' ? getPlayerWeaponSheet(p) : null
   const useSheet = Boolean(weaponSheet && weaponSheet.loaded && weaponSheet.img)
   let frameIdx = 0
 

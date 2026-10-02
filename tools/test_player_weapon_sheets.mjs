@@ -57,6 +57,15 @@ const blInfo = checkPng(benleiPath, 540, 360);
 assert(blInfo.isPng, '奔雷古剑序列帧为标准 PNG 格式');
 assert(blInfo.w === 540 && blInfo.h === 360, `奔雷古剑序列帧规格为 540x360 6帧 (实际: ${blInfo.w}x${blInfo.h})`);
 
+// 法修（清虚仙子）八卦阵盘
+const baguaPath = path.resolve('public/player_spell_bagua_sheet.png');
+assert(fs.existsSync(baguaPath), '八卦阵盘序列帧贴图 public/player_spell_bagua_sheet.png 存在');
+const baguaStat = fs.statSync(baguaPath);
+assert(baguaStat.size > 50000, `八卦阵盘序列帧贴图有效 (${baguaStat.size} bytes > 50KB)`);
+const baguaInfo = checkPng(baguaPath, 540, 360);
+assert(baguaInfo.isPng, '八卦阵盘序列帧为标准 PNG 格式');
+assert(baguaInfo.w === 540 && baguaInfo.h === 360, `八卦阵盘序列帧规格为 540x360 6帧 (实际: ${baguaInfo.w}x${baguaInfo.h})`);
+
 // 3. 构建 Headless 浏览器 Mock 环境并加载 main.js
 const elements = new Map();
 const dummyCtx = {
@@ -238,6 +247,13 @@ assert(blSheet.src === './player_sword_benlei_sheet.png', '奔雷古剑贴图采
 assert(blSheet.frameW === 180 && blSheet.frameH === 180, '奔雷古剑单帧尺寸为 180x180');
 assert(blSheet.cols === 3 && blSheet.rows === 2 && blSheet.totalFrames === 6, '奔雷古剑为 3 列 2 行共 6 帧动画');
 
+// 法修（清虚仙子）八卦阵盘序列帧
+const baguaSheet = textures.getSheet('spell_bagua');
+assert(Boolean(baguaSheet), '八卦阵盘序列帧配置项存在');
+assert(baguaSheet.src === './player_spell_bagua_sheet.png', '八卦阵盘贴图采用正确的相对路径 ./player_spell_bagua_sheet.png');
+assert(baguaSheet.frameW === 180 && baguaSheet.frameH === 180, '八卦阵盘单帧尺寸为 180x180');
+assert(baguaSheet.cols === 3 && baguaSheet.rows === 2 && baguaSheet.totalFrames === 6, '八卦阵盘为 3 列 2 行共 6 帧动画');
+
 // 5. 验证根据玩家所持武器动态解析贴图 (getPlayerWeaponSheet)
 const getSheet = controls.getPlayerWeaponSheet;
 assert(typeof getSheet === 'function', 'getPlayerWeaponSheet 方法已定义');
@@ -254,9 +270,20 @@ assert(getSheet(pSwordJifeng) === jfSheet, '剑修执疾风残刃时成功匹配
 const pSwordBenlei = { charId: 'sword', weaponId: 'sword_benlei', weaponType: 'thunder_sword' };
 assert(getSheet(pSwordBenlei) === blSheet, '剑修执奔雷古剑时成功匹配奔雷古剑序列帧');
 
-// 非剑修角色 (如法修 spell, 体修 body)
-const pSpell = { charId: 'spell', weaponId: 'spell_fire', weaponType: 'spell_fire' };
-assert(getSheet(pSpell) === null, '法修等其他非剑修职业返回 null，平滑回退至其自身专属立绘');
+// 法修执八卦阵盘
+const pSpellBagua = { charId: 'spell', weaponId: 'spell_bagua', weaponType: 'bagua' };
+assert(getSheet(pSpellBagua) === baguaSheet, '法修执八卦阵盘时成功匹配其专属序列帧');
+
+// 没登记帧集的武器（含法修其余法宝）应返回 null，平滑回退到各自专属立绘
+const pSpellUnregistered = { charId: 'spell', weaponId: 'spell_fire', weaponType: 'spell_fire' };
+assert(getSheet(pSpellUnregistered) === null, '未登记帧集的武器返回 null，平滑回退至其自身专属立绘');
+
+const pBody = { charId: 'body', weaponId: 'body_ding', weaponType: 'ding' };
+assert(getSheet(pBody) === null, '体修等无帧集职业返回 null，平滑回退至其自身专属立绘');
+
+// 剑修未匹配到具体武器时仍回退到默认青锋灵剑（保持既有行为）
+const pSwordFallback = { charId: 'sword', weaponId: 'sword_unknown', weaponType: 'unknown' };
+assert(getSheet(pSwordFallback) === qfSheet, '剑修未匹配时回退默认青锋灵剑序列帧');
 
 // 6. 验证出招计时器 (attackTimer) 与攻击动作帧律动
 const game = controls.game;
