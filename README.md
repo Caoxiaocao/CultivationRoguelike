@@ -49,7 +49,33 @@ npm run electron:dev
 
 # 构建 Windows 安装包与免安装便携版
 npm run electron:dist
+
+# 贴图体积优化（按实际绘制尺寸降采样 + 无损重编码，需 Python + Pillow + numpy）
+npm run art:optimize
+
+# 导入新素材（自动抠底 / 归一化构图 / 切帧 / 打包序列帧）
+npm run art:import -- --in art-source/raw/xxx.jpg --out public/xxx.png --size 256 --anchor bottom
 ```
+
+---
+
+## 🎨 素材管线
+
+贴图相关的工具都在 `tools/art/`，原始出图归档在 `art-source/`。
+
+| 工具 | 作用 |
+| :--- | :--- |
+| [`tools/art/artlib.py`](tools/art/artlib.py) | 核心库：抠底、预乘 alpha 重采样、切帧、打包 |
+| [`tools/art/import_art.py`](tools/art/import_art.py) | 通用导入器：AI 出图 → 游戏可用贴图 |
+| [`tools/art/optimize_assets.py`](tools/art/optimize_assets.py) | 按实际绘制尺寸压缩贴图 |
+
+**关于贴图分辨率**：游戏画布缓冲区被 `renderScale` 钳制在 1920×1080（最多 2400×1350），
+与显示器是 1080p / 2K / 4K 无关。因此贴图的可用细节上限就是它在 1920×1080 缓冲区里占的像素数，
+超出部分在 2K/4K 上不会带来任何可见收益。`optimize_assets.py` 里的 `TARGETS` 表就是按
+源码中实测的绘制尺寸推导出来的，`PROTECTED` 表则记录了不能压的贴图及其原因。
+
+抠底采用**连通域判定**：只有能从图像边缘走到的背景才算真背景。否则白底上的白袍、
+浅色皮肤会被一起抠掉，在角色身上留下半透明空洞。
 
 ---
 

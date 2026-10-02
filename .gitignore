@@ -4,6 +4,12 @@ node_modules/
 # Production build outputs
 dist/
 dist_electron/
+*.tsbuildinfo
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
 
 # Logs
 logs/
@@ -30,3 +36,15 @@ scratch/
 *.tmp
 *.bak
 *.curr
+
+# Tooling scratch
+.dsh/
+acl-recovery/
+
+# 贴图优化的本地备份。压缩前的原始贴图已在首个提交 12f08fe 中，
+# 需要时可 `git checkout 12f08fe -- public/` 取回，因此不入库。
+.art-backup/
+
+# Python（tools/art 下的素材处理脚本）
+__pycache__/
+*.pyc

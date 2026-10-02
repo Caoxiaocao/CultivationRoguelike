@@ -5,7 +5,10 @@ const path = require('path');
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('headless');
 
-const brainDir = 'C:/Users/Administrator/.gemini/antigravity/brain/bce5c981-c741-4fb6-b269-6bc282a5d487';
+// 原始 AI 出图目录：默认取仓库内归档 art-source/raw，可用环境变量 ART_SOURCE_DIR 覆盖。
+// 原先硬编码 Antigravity 的绝对路径（C:/Users/Administrator/.gemini/...），换机器即失效。
+const brainDir = (process.env.ART_SOURCE_DIR
+  || path.join(__dirname, '..', 'art-source', 'raw')).replace(/\\/g, '/');
 
 const inputFiles = {
   skull: path.join(brainDir, 'corpse_skull_art_1790848004880.jpg').replace(/\\/g, '/'),

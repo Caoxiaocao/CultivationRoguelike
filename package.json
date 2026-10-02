@@ -12,7 +12,9 @@
     "test:all": "npm run build && node tools/run_all_tests.mjs",
     "electron:dev": "vite build && electron .",
     "electron:pack": "vite build && electron-builder --dir",
-    "electron:dist": "vite build && electron-builder"
+    "electron:dist": "vite build && electron-builder",
+    "art:optimize": "python tools/art/optimize_assets.py",
+    "art:import": "python tools/art/import_art.py"
   },
   "build": {
     "appId": "com.xianxia.roguelite",
