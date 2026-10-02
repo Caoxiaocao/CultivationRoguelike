@@ -1,0 +1,19 @@
+# 统一换行符：仓库与工作区一律使用 LF，避免 Windows 上的 CRLF 抖动
+* text=auto eol=lf
+
+# 贴图与音频一律按二进制处理，禁止换行转换与文本 diff
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.bmp  binary
+*.ttf  binary
+*.otf  binary
+*.woff binary
+*.woff2 binary
+*.mp3  binary
+*.ogg  binary
+*.wav  binary
+*.zip  binary
