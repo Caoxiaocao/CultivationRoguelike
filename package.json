@@ -14,7 +14,8 @@
     "electron:pack": "vite build && electron-builder --dir",
     "electron:dist": "vite build && electron-builder",
     "art:optimize": "python tools/art/optimize_assets.py",
-    "art:import": "python tools/art/import_art.py"
+    "art:import": "python tools/art/import_art.py",
+    "art:frame": "electron tools/capture_frame.cjs"
   },
   "build": {
     "appId": "com.xianxia.roguelite",

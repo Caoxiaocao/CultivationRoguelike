@@ -11515,8 +11515,27 @@ function drawProjectileModel(proj, elapsed) {
     ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.2; ctx.stroke()
     ctx.fillStyle = '#1e293b'; ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI); ctx.fill()
   } else if (kind === 'fuchen') {
-    ctx.fillStyle = 'rgba(180, 240, 235, 0.9)'
-    ctx.beginPath(); ctx.moveTo(12, 0); ctx.quadraticCurveTo(0, -6, -14, -2); ctx.quadraticCurveTo(0, 6, 12, 0); ctx.closePath(); ctx.fill()
+    // 碧霞仙浪扇面：银白渐至冰蓝，与清虚仙子同色系（原为高饱和薄荷绿）
+    const fanGrad = ctx.createLinearGradient(16, 0, -10, 0)
+    fanGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)')
+    fanGrad.addColorStop(0.5, 'rgba(207, 230, 240, 0.85)')
+    fanGrad.addColorStop(1, 'rgba(176, 208, 226, 0)')
+    ctx.fillStyle = fanGrad
+    ctx.beginPath()
+    ctx.moveTo(-10, 0)
+    ctx.lineTo(13, -10)
+    ctx.quadraticCurveTo(19, 0, 13, 10)
+    ctx.closePath()
+    ctx.fill()
+    // 拂丝高光：几道银白细弧
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)'
+    ctx.lineWidth = 1
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath()
+      ctx.moveTo(-8, i * 2.5)
+      ctx.quadraticCurveTo(4, i * 6.5, 14, i * 8)
+      ctx.stroke()
+    }
   } else if (kind === 'baozhu') {
     const grad = ctx.createRadialGradient(0, 0, 1, 0, 0, 8)
     grad.addColorStop(0, '#ffffff'); grad.addColorStop(0.5, '#d8b4fe'); grad.addColorStop(1, 'rgba(168, 85, 247, 0)')
@@ -12132,26 +12151,73 @@ function drawFuchenEntity(c, x, y, angle, scale = 1, isAttacking = false, attack
   c.rotate(angle)
   c.scale(scale, scale)
 
-  c.fillStyle = '#78350f'
-  c.fillRect(-14, -1.8, 14, 3.6)
-  c.fillStyle = '#f59e0b'
-  c.fillRect(-2, -2.4, 3, 4.8)
+  // 灵木拂尘 —— 对齐清虚仙子：青玉为骨 / 银白为魂 / 冰蓝为灵
+  // 造型依据 art-source/briefs/weapon_fuchen_redesign.md
+  // 轴向约定与其他法宝一致：柄在 -x，拂尾朝 +x。
+  //
+  // 尺寸约束：法修单法宝时由 drawFloatingWeapons 以固定偏移 (-20,-14)、scale=1 绘制，
+  // 器物总长若超过约 30 单位就会横贯角色身体、并挡住束环与灵晶。故全长控制在 27 单位。
 
-  const wave = Math.sin((x + y) * 0.1) * 3
-  c.fillStyle = 'rgba(240, 253, 250, 0.85)'
+  // 1. 尾端银白短绦（先画，被柄身压住一部分）
+  c.strokeStyle = 'rgba(232, 238, 242, 0.75)'
+  c.lineWidth = 1
   c.beginPath()
-  c.moveTo(1, -2)
-  c.quadraticCurveTo(10, -5 + wave, 18, 0)
-  c.quadraticCurveTo(12, 5 + wave, 1, 2)
-  c.closePath()
+  c.moveTo(-11, 0)
+  c.quadraticCurveTo(-14, 1.2, -15.6, 2.8)
+  c.stroke()
+
+  // 2. 手柄：玉化灵木（青瓷淡青玉；上缘受光、下缘入暗）
+  const woodGrad = c.createLinearGradient(0, -2.4, 0, 2.4)
+  woodGrad.addColorStop(0, '#D8E8DE')
+  woodGrad.addColorStop(0.5, '#A9C6B8')
+  woodGrad.addColorStop(1, '#7E9C8C')
+  c.fillStyle = woodGrad
+  c.fillRect(-11, -2.2, 9, 4.4)
+
+  // 3. 束环：哑光银白玉箍，灵晶镶嵌其中
+  c.fillStyle = '#C3CFD8'
+  c.fillRect(-2, -3.2, 6, 6.4)
+  c.fillStyle = '#E8EEF2'
+  c.fillRect(-2, -3.2, 6, 2.4)
+
+  // 4. 灵枢宝珠：冰蓝灵晶（与角色手中的灵晶同色，是"这把武器属于她"的识别点）
+  const gemGrad = c.createRadialGradient(0.2, -0.9, 0.2, 1, 0, 3.1)
+  gemGrad.addColorStop(0, '#FFFFFF')
+  gemGrad.addColorStop(0.5, '#CFE6F0')
+  gemGrad.addColorStop(1, 'rgba(176, 208, 226, 0.95)')
+  c.fillStyle = gemGrad
+  c.beginPath()
+  c.arc(1, 0, 2.7, 0, Math.PI * 2)
   c.fill()
 
-  c.strokeStyle = '#99f6e4'
-  c.lineWidth = 1.2
+  // 5. 拂丝：银白扇形，根部纯白渐至末端冰蓝
+  const wave = Math.sin((x + y) * 0.1) * 1.8
+  const spread = isAttacking ? 1 + Math.sin(attackProgress * Math.PI) * 0.35 : 1
+  const tipX = 16 * spread
+  const silkGrad = c.createLinearGradient(4, 0, tipX, 0)
+  silkGrad.addColorStop(0, 'rgba(255, 255, 255, 0.96)')
+  silkGrad.addColorStop(0.55, 'rgba(233, 242, 246, 0.9)')
+  silkGrad.addColorStop(1, 'rgba(176, 208, 226, 0.88)')
+  c.strokeStyle = silkGrad
+  c.lineWidth = 1.6
+  c.lineCap = 'round'
+  for (let i = 0; i < 5; i++) {
+    const off = (i / 4 - 0.5) * 2
+    c.beginPath()
+    c.moveTo(4, off * 1.3)
+    c.quadraticCurveTo(10, off * 4 + wave * 0.7, tipX, off * 5.6 * spread + wave)
+    c.stroke()
+  }
+
+  // 6. 外缘薄青白辉光（加色；薄而通透，不糊成雾团）
+  c.globalCompositeOperation = 'lighter'
+  c.strokeStyle = 'rgba(150, 232, 224, 0.3)'
+  c.lineWidth = 3.2
   c.beginPath()
-  c.moveTo(1, 0)
-  c.quadraticCurveTo(12, wave, 19, wave * 0.5)
+  c.moveTo(4, 0)
+  c.quadraticCurveTo(10, wave, tipX, wave * 0.5)
   c.stroke()
+  c.globalCompositeOperation = 'source-over'
 
   c.restore()
 }
