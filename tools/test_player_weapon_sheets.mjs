@@ -75,6 +75,15 @@ const fuchenInfo = checkPng(fuchenPath, 540, 360);
 assert(fuchenInfo.isPng, '灵木拂尘序列帧为标准 PNG 格式');
 assert(fuchenInfo.w === 540 && fuchenInfo.h === 360, `灵木拂尘序列帧规格为 540x360 6帧 (实际: ${fuchenInfo.w}x${fuchenInfo.h})`);
 
+// 法修（清虚仙子）混元宝珠
+const baozhuPath = path.resolve('public/player_spell_baozhu_sheet.png');
+assert(fs.existsSync(baozhuPath), '混元宝珠序列帧贴图 public/player_spell_baozhu_sheet.png 存在');
+const baozhuStat = fs.statSync(baozhuPath);
+assert(baozhuStat.size > 50000, `混元宝珠序列帧贴图有效 (${baozhuStat.size} bytes > 50KB)`);
+const baozhuInfo = checkPng(baozhuPath, 540, 360);
+assert(baozhuInfo.isPng, '混元宝珠序列帧为标准 PNG 格式');
+assert(baozhuInfo.w === 540 && baozhuInfo.h === 360, `混元宝珠序列帧规格为 540x360 6帧 (实际: ${baozhuInfo.w}x${baozhuInfo.h})`);
+
 // 3. 构建 Headless 浏览器 Mock 环境并加载 main.js
 const elements = new Map();
 const dummyCtx = {
@@ -270,6 +279,13 @@ assert(fuchenSheet.src === './player_spell_fuchen_sheet.png', '灵木拂尘贴�
 assert(fuchenSheet.frameW === 180 && fuchenSheet.frameH === 180, '灵木拂尘单帧尺寸为 180x180');
 assert(fuchenSheet.cols === 3 && fuchenSheet.rows === 2 && fuchenSheet.totalFrames === 6, '灵木拂尘为 3 列 2 行共 6 帧动画');
 
+// 法修（清虚仙子）混元宝珠序列帧
+const baozhuSheet = textures.getSheet('spell_baozhu');
+assert(Boolean(baozhuSheet), '混元宝珠序列帧配置项存在');
+assert(baozhuSheet.src === './player_spell_baozhu_sheet.png', '混元宝珠贴图采用正确的相对路径 ./player_spell_baozhu_sheet.png');
+assert(baozhuSheet.frameW === 180 && baozhuSheet.frameH === 180, '混元宝珠单帧尺寸为 180x180');
+assert(baozhuSheet.cols === 3 && baozhuSheet.rows === 2 && baozhuSheet.totalFrames === 6, '混元宝珠为 3 列 2 行共 6 帧动画');
+
 // 5. 验证根据玩家所持武器动态解析贴图 (getPlayerWeaponSheet)
 const getSheet = controls.getPlayerWeaponSheet;
 assert(typeof getSheet === 'function', 'getPlayerWeaponSheet 方法已定义');
@@ -293,6 +309,14 @@ assert(getSheet(pSpellBagua) === baguaSheet, '法修执八卦阵盘时成功匹�
 // 法修执灵木拂尘
 const pSpellFuchen = { charId: 'spell', weaponId: 'spell_fuchen', weaponType: 'fuchen' };
 assert(getSheet(pSpellFuchen) === fuchenSheet, '法修执灵木拂尘时成功匹配其专属序列帧');
+
+// 法修执混元宝珠
+const pSpellBaozhu = { charId: 'spell', weaponId: 'spell_baozhu', weaponType: 'baozhu' };
+assert(getSheet(pSpellBaozhu) === baozhuSheet, '法修执混元宝珠时成功匹配其专属序列帧');
+
+// 三件本命神兵齐备
+assert([pSpellBagua, pSpellFuchen, pSpellBaozhu].every(q => getSheet(q) !== null),
+  '清虚仙子三件本命神兵均有专属序列帧');
 
 // 没登记帧集的武器（含法修其余法宝）应返回 null，平滑回退到各自专属立绘
 const pSpellUnregistered = { charId: 'spell', weaponId: 'spell_fire', weaponType: 'spell_fire' };

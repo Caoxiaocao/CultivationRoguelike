@@ -1242,12 +1242,14 @@ const playerWeaponSheets = {
   sword_benlei: { img: typeof Image !== 'undefined' ? new Image() : null, loaded: false, src: './player_sword_benlei_sheet.png', frameW: 180, frameH: 180, cols: 3, rows: 2, totalFrames: 6 },
   spell_bagua: { img: typeof Image !== 'undefined' ? new Image() : null, loaded: false, src: './player_spell_bagua_sheet.png', frameW: 180, frameH: 180, cols: 3, rows: 2, totalFrames: 6 },
   spell_fuchen: { img: typeof Image !== 'undefined' ? new Image() : null, loaded: false, src: './player_spell_fuchen_sheet.png', frameW: 180, frameH: 180, cols: 3, rows: 2, totalFrames: 6 },
+  spell_baozhu: { img: typeof Image !== 'undefined' ? new Image() : null, loaded: false, src: './player_spell_baozhu_sheet.png', frameW: 180, frameH: 180, cols: 3, rows: 2, totalFrames: 6 },
 }
 playerWeaponSheets['sword'] = playerWeaponSheets.sword_qingfeng
 playerWeaponSheets['daggers'] = playerWeaponSheets.sword_jifeng
 playerWeaponSheets['thunder_sword'] = playerWeaponSheets.sword_benlei
 playerWeaponSheets['bagua'] = playerWeaponSheets.spell_bagua
 playerWeaponSheets['fuchen'] = playerWeaponSheets.spell_fuchen
+playerWeaponSheets['baozhu'] = playerWeaponSheets.spell_baozhu
 
 if (!isHeadless) {
   for (const k in playerWeaponSheets) {
