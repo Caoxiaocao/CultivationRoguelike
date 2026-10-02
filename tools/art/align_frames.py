@@ -67,6 +67,27 @@ def robust_top(mask: np.ndarray, min_px: int = 3) -> int:
     return int(rows.min()) if rows.size else 0
 
 
+def robust_span(mask: np.ndarray, min_px: int = 3, wide_ratio: float = 1.7) -> tuple[int, int]:
+    """返回角色本体的 (头顶 y, 脚底 y)。
+
+    只用中央窄带定位身体，并剔除"整行宽度异常大"的行 —— 那通常是地面法阵之类的
+    特效横扫，会把角色高度撑大（实测：八卦阵盘帧 3 因此虚高到 331px）。
+    """
+    h, w = mask.shape
+    band = mask[:, int(w * 0.45):int(w * 0.55)]
+    cnt = band.sum(1)
+    widths = mask.sum(1)
+    valid = widths > 0
+    med_w = float(np.median(widths[valid])) if valid.any() else 0.0
+    limit = med_w * wide_ratio if med_w > 0 else float("inf")
+    rows = [y for y in range(h) if cnt[y] >= min_px and widths[y] <= limit]
+    if not rows:
+        rows = list(np.nonzero(cnt >= min_px)[0])
+    if not rows:
+        return 0, h - 1
+    return int(min(rows)), int(max(rows))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="序列帧网格对齐与打包")
     ap.add_argument("--in", dest="src", required=True)
@@ -95,63 +116,60 @@ def main() -> int:
     # 1) 抠底
     cut = [remove_background(f, args.bg, args.tol_lo, args.tol_hi, seal=args.seal) for f in frames]
 
-    # 2) 逐帧测头顶
-    tops = [robust_top(np.asarray(f)[..., 3] > 128) for f in cut]
+    # 2) 逐帧测头顶与角色本体高度
+    spans = [robust_span(np.asarray(f)[..., 3] > 128) for f in cut]
+    tops = [t for t, _ in spans]
+    heights = [b - t + 1 for t, b in spans]
     print(f"\n各帧头顶 y: {tops}   极差 {max(tops)-min(tops)}px")
-
-    # 3) 估计角色本体高度（中位数，避免带地面法阵的帧把高度拉大）
-    heights = []
-    for f, t in zip(cut, tops):
-        b = content_bbox(f)[3] - 1
-        heights.append(b - t + 1)
+    print(f"各帧角色高: {heights}")
     char_h = int(np.median(heights))
-    print(f"各帧内容高: {heights}   取中位角色高 = {char_h}px")
+    print(f"取中位角色高 = {char_h}px（逐帧按此归一，消除整行缩放差异）")
 
-    # 4) 统一缩放到 [head, baseline] 区间
+    # 3) 统一映射到 [head, baseline] 区间，并对每帧做高度归一化
     F = args.frame
     target_h = (args.baseline - args.head) * F
-    s = target_h / char_h
+    s_global = target_h / char_h
     head_y = args.head * F
-    print(f"缩放系数 {s:.4f}  -> 角色高 {char_h}px 映射为 {target_h:.1f}px，"
+    print(f"全局缩放 {s_global:.4f}  -> 角色高 {char_h}px 映射为 {target_h:.1f}px，"
           f"头顶 y={head_y:.1f}，脚底 y={args.baseline*F:.1f}")
 
-    # 5) 逐帧对齐并放置到 F×F
+    # 4) 逐帧对齐并放置到 F×F
     placed = []
-    for i, (f, t) in enumerate(zip(cut, tops)):
+    for i, (f, t, hgt) in enumerate(zip(cut, tops, heights)):
+        # 本帧缩放 = 全局缩放 × 高度归一化系数
+        s = s_global * (char_h / hgt)
         w, h = f.size
         scaled_w, scaled_h = max(1, round(w * s)), max(1, round(h * s))
         small = unpremultiply(f.convert("RGBA").resize((scaled_w, scaled_h), Image.Resampling.LANCZOS))
-        # 源帧的头顶会落在 small 的 round(t*s) 处，把它抬到 head_y
         y_off = int(round(head_y - t * s))
-        # 水平：按内容包围盒中心对齐到帧中心
         l, _, r, _ = content_bbox(f)
         cx_src = (l + r - 1) / 2 * s
         x_off = int(round(F / 2 - cx_src))
         canvas = Image.new("RGBA", (F, F), (0, 0, 0, 0))
         canvas.alpha_composite(small, (x_off, y_off))
         placed.append(canvas)
-        if i == 0 or tops[i] != tops[0]:
-            print(f"  帧{i}: 头顶源 y={t} -> 位移 {y_off:+d}px, 水平 {x_off:+d}px")
+        print(f"  帧{i}: 头顶源 y={t} 高={hgt} -> 缩放 {s:.4f} 位移 {y_off:+d}px 水平 {x_off:+d}px")
 
-    # 6) 打包
+    # 5) 打包
     pc = args.pack_cols
     pr = (len(placed) + pc - 1) // pc
     sheet = Image.new("RGBA", (pc * F, pr * F), (0, 0, 0, 0))
     for i, p in enumerate(placed):
         sheet.paste(p, ((i % pc) * F, (i // pc) * F), p)
 
-    # 7) 复核：对齐后各帧头顶与脚底
+    # 6) 复核：对齐后各帧头顶与角色脚底
     print("\n对齐后复核:")
     ok = True
     for i, p in enumerate(placed):
         m = np.asarray(p)[..., 3] > 128
-        t2 = robust_top(m)
-        b2 = content_bbox(p)[3] - 1
+        t2, b2 = robust_span(m)
         dev = abs(t2 - head_y)
-        flag = "OK" if dev <= 3 else "!!"
-        if dev > 3: ok = False
-        print(f"  帧{i}: 头顶 {t2:>3} (目标 {head_y:.0f}) 偏差 {t2-head_y:+.0f}px {flag}"
-              f"   内容底边 {b2/F*100:5.1f}%")
+        foot = (b2 + 1) / F * 100
+        foot_dev = abs(foot - args.baseline * 100)
+        flag = "OK" if dev <= 3 and foot_dev <= 2.5 else "!!"
+        if flag == "!!": ok = False
+        print(f"  帧{i}: 头顶 {t2:>3} (目标 {head_y:.0f}, 偏差 {t2-head_y:+.0f}px)  "
+              f"角色脚底 {foot:5.1f}% (目标 {args.baseline*100:.0f}%) {flag}")
     print("对齐" + ("通过" if ok else "仍有偏差，请检查"))
 
     out_path = os.path.normpath(os.path.join(ROOT, args.dst)) if not os.path.isabs(args.dst) else args.dst

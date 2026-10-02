@@ -24,10 +24,12 @@
 | :--- | :--- |
 | **形象与画风基准（必须对齐）** | [`public/player_fairy.png`](../../public/player_fairy.png) |
 | 比例与帧规格对照（已完成，可参考） | [`public/player_sword_qingfeng_sheet.png`](../../public/player_sword_qingfeng_sheet.png) |
+| ✅ 已产出：八卦阵盘序列帧 | [`public/player_spell_bagua_sheet.png`](../../public/player_spell_bagua_sheet.png) |
+| ✅ 已产出：灵木拂尘序列帧 | [`public/player_spell_fuchen_sheet.png`](../../public/player_spell_fuchen_sheet.png) |
+| ⬜ 待产出：混元宝珠序列帧 | `player_spell_baozhu_sheet.png` |
 
-> [!NOTE]
-> 法修目前**尚无任何动作序列帧**，本节暂以角色立绘为唯一基准。
-> 三套序列帧产出后，请把成品图补入本表，供后续武器沿用同一形象。
+> 已产出的两套可作为后续出图的**同源参照**：形象、头身比、帧基线都已统一，
+> 新的一套请与它们并排比对，确保三套之间角色形象完全一致。
 
 ---
 

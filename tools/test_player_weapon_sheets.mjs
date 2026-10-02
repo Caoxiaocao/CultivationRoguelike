@@ -66,6 +66,15 @@ const baguaInfo = checkPng(baguaPath, 540, 360);
 assert(baguaInfo.isPng, '八卦阵盘序列帧为标准 PNG 格式');
 assert(baguaInfo.w === 540 && baguaInfo.h === 360, `八卦阵盘序列帧规格为 540x360 6帧 (实际: ${baguaInfo.w}x${baguaInfo.h})`);
 
+// 法修（清虚仙子）灵木拂尘
+const fuchenPath = path.resolve('public/player_spell_fuchen_sheet.png');
+assert(fs.existsSync(fuchenPath), '灵木拂尘序列帧贴图 public/player_spell_fuchen_sheet.png 存在');
+const fuchenStat = fs.statSync(fuchenPath);
+assert(fuchenStat.size > 50000, `灵木拂尘序列帧贴图有效 (${fuchenStat.size} bytes > 50KB)`);
+const fuchenInfo = checkPng(fuchenPath, 540, 360);
+assert(fuchenInfo.isPng, '灵木拂尘序列帧为标准 PNG 格式');
+assert(fuchenInfo.w === 540 && fuchenInfo.h === 360, `灵木拂尘序列帧规格为 540x360 6帧 (实际: ${fuchenInfo.w}x${fuchenInfo.h})`);
+
 // 3. 构建 Headless 浏览器 Mock 环境并加载 main.js
 const elements = new Map();
 const dummyCtx = {
@@ -254,6 +263,13 @@ assert(baguaSheet.src === './player_spell_bagua_sheet.png', '八卦阵盘贴图�
 assert(baguaSheet.frameW === 180 && baguaSheet.frameH === 180, '八卦阵盘单帧尺寸为 180x180');
 assert(baguaSheet.cols === 3 && baguaSheet.rows === 2 && baguaSheet.totalFrames === 6, '八卦阵盘为 3 列 2 行共 6 帧动画');
 
+// 法修（清虚仙子）灵木拂尘序列帧
+const fuchenSheet = textures.getSheet('spell_fuchen');
+assert(Boolean(fuchenSheet), '灵木拂尘序列帧配置项存在');
+assert(fuchenSheet.src === './player_spell_fuchen_sheet.png', '灵木拂尘贴图采用正确的相对路径 ./player_spell_fuchen_sheet.png');
+assert(fuchenSheet.frameW === 180 && fuchenSheet.frameH === 180, '灵木拂尘单帧尺寸为 180x180');
+assert(fuchenSheet.cols === 3 && fuchenSheet.rows === 2 && fuchenSheet.totalFrames === 6, '灵木拂尘为 3 列 2 行共 6 帧动画');
+
 // 5. 验证根据玩家所持武器动态解析贴图 (getPlayerWeaponSheet)
 const getSheet = controls.getPlayerWeaponSheet;
 assert(typeof getSheet === 'function', 'getPlayerWeaponSheet 方法已定义');
@@ -273,6 +289,10 @@ assert(getSheet(pSwordBenlei) === blSheet, '剑修执奔雷古剑时成功匹配
 // 法修执八卦阵盘
 const pSpellBagua = { charId: 'spell', weaponId: 'spell_bagua', weaponType: 'bagua' };
 assert(getSheet(pSpellBagua) === baguaSheet, '法修执八卦阵盘时成功匹配其专属序列帧');
+
+// 法修执灵木拂尘
+const pSpellFuchen = { charId: 'spell', weaponId: 'spell_fuchen', weaponType: 'fuchen' };
+assert(getSheet(pSpellFuchen) === fuchenSheet, '法修执灵木拂尘时成功匹配其专属序列帧');
 
 // 没登记帧集的武器（含法修其余法宝）应返回 null，平滑回退到各自专属立绘
 const pSpellUnregistered = { charId: 'spell', weaponId: 'spell_fire', weaponType: 'spell_fire' };
