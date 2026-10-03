@@ -13732,8 +13732,17 @@ function startWeaponOrbitAnimation() {
       ? getPlayerWeaponSheet({ charId: curChar.id, weaponId: curWeapon.id, weaponType: curWeapon.type })
       : null
     if (previewSheet && previewSheet.loaded && previewSheet.img) {
-      // 在法宝环绕展台中循环演练该法宝的 6 帧起手与斩击连招
-      const frameIdx = Math.floor((t * 2.8) % 6)
+      // 在法宝环绕展台中循环演练该法宝的 6 帧起手与斩击连招。
+      // 节奏刻意做成"待机停留 + 连招快放"：帧 0 是待机、帧 1~5 才是起手到收招，
+      // 若对 6 帧做匀速循环（原先 2.8fps，每帧约 357ms），既慢得像幻灯片，
+      // 又把待机和出招混成一串，看不出攻击的爆发感。
+      const IDLE_HOLD = 0.5      // 待机帧停留秒数
+      const ACTION_FPS = 15      // 连招帧率：5 帧约 0.33s，接近战斗内 0.28s 的出招时长
+      const actionSpan = 5 / ACTION_FPS
+      const loopT = t % (IDLE_HOLD + actionSpan)
+      const frameIdx = loopT < IDLE_HOLD
+        ? 0
+        : Math.min(5, 1 + Math.floor((loopT - IDLE_HOLD) * ACTION_FPS))
       const cols = previewSheet.cols || 3
       const fw = previewSheet.frameW || 180
       const fh = previewSheet.frameH || 180
