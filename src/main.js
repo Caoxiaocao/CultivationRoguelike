@@ -1647,7 +1647,10 @@ function executeWeaponAttack(target, angleOffset = 0, damage = game.attack, colo
   game.player.attackAngle = angle
 
   // Headless mode: keep classic projectile behavior to pass smoke-test.mjs
-  if (isHeadless) {
+  // 例外：测试可用 globalThis.__FORCE_WEAPON_SPECIALS__ 打开真实法宝分支。
+  // 否则所有法宝的特殊攻击（重鼎下压、金锤飞出下砸、龙拳贯通……）在 headless 下
+  // 一律走通用弹道，等于整块行为无法被任何测试覆盖。
+  if (isHeadless && !globalThis.__FORCE_WEAPON_SPECIALS__) {
     shootClassic(target, angleOffset, actualDamage, color, radius)
     return
   }
@@ -1689,18 +1692,22 @@ function executeWeaponAttack(target, angleOffset = 0, damage = game.attack, colo
     const targetX = game.player.x + Math.cos(angle) * throwDist
     const targetY = game.player.y + Math.sin(angle) * throwDist
 
+    // 九疑重鼎 · 镇压：上抛旋转放大 -> 滞空蓄势 -> 加速下压 -> 落地范围冲击波
     game.specialAttacks.push({
       type: 'ding_crush',
-      phase: 'launch', // 'launch' -> 'crash' -> 'recall'
+      phase: 'rise', // 'rise' -> 'hang' -> 'slam' -> 'crash' -> 'recall'
       startX: game.player.x,
       startY: game.player.y,
       x: game.player.x,
       y: game.player.y,
       targetX,
       targetY,
-      spin: 0,
-      phaseTimer: 0.32,
-      phaseDuration: 0.32,
+      spin: 0,             // 累积自转角（弧度）：飞行途中持续旋转
+      scale: 0.95,         // 随飞行逐渐变大，落地时最沉
+      arcY: 0,             // 离地高度（负值 = 在空中）
+      apexY: 130,          // 滞空高度
+      phaseTimer: 0.24,
+      phaseDuration: 0.24, // rise
       radius: 18,
       maxRadius: 90 + (game.dingRadiusBonus || 0),
       damage: actualDamage,
@@ -2278,28 +2285,61 @@ function updateSpecialAttacks(dt) {
     else if (atk.type === 'ding_crush') {
       atk.phaseTimer -= dt
 
-      if (atk.phase === 'launch') {
+      // 三个阶段：rise(上抛) -> hang(滞空蓄势) -> slam(加速下压)
+      // 全程持续自转并逐渐放大，真正落地那一下交给 crash 出范围冲击波
+      if (atk.phase === 'rise' || atk.phase === 'hang' || atk.phase === 'slam') {
         const prog = 1 - Math.max(0, atk.phaseTimer / atk.phaseDuration)
-        atk.x = atk.startX + (atk.targetX - atk.startX) * prog
-        atk.y = atk.startY + (atk.targetY - atk.startY) * prog
-        atk.arcY = -Math.sin(prog * Math.PI) * 90
+
+        if (atk.phase === 'rise') {
+          // 水平先快后慢、收在落点上方；垂直减速上抛到 apexY
+          const hp = 1 - Math.pow(1 - prog, 3)
+          atk.x = atk.startX + (atk.targetX - atk.startX) * hp
+          atk.y = atk.startY + (atk.targetY - atk.startY) * hp
+          atk.arcY = -atk.apexY * (1 - Math.pow(1 - prog, 2))
+          atk.spin = Math.pow(prog, 1.5) * Math.PI * 2.6   // 由慢到快，约 1.3 圈
+          atk.scale = 0.95 + prog * 0.55
+        } else if (atk.phase === 'hang') {
+          // 顶点滞空蓄势：与随后的急速下压形成反差，这一顿才显得"重"
+          atk.arcY = -atk.apexY
+          atk.spin += dt * 3.4
+          atk.scale = 1.50 + prog * 0.14
+        } else {
+          // 加速下压：三次方加速
+          atk.arcY = -atk.apexY * (1 - Math.pow(prog, 3))
+          atk.spin += dt * 9.0
+          atk.scale = 1.64 + prog * 0.18
+        }
 
         if (atk.phaseTimer <= 0) {
-          atk.phase = 'crash'
-          atk.phaseTimer = 0.35
-          atk.phaseDuration = 0.35
-          atk.x = atk.targetX
-          atk.y = atk.targetY
-          atk.arcY = 0
-          atk.crashRadius = 18
-          atk.hitEnemies = new Set()
-          if (!isHeadless) sound.crash?.()
-          game.cameraShake = 0.20
-          burst(atk.x, atk.y, '#e69848', 16, 70)
+          if (atk.phase === 'rise') {
+            atk.phase = 'hang'
+            atk.phaseTimer = 0.06
+            atk.phaseDuration = 0.06
+          } else if (atk.phase === 'hang') {
+            atk.phase = 'slam'
+            atk.phaseTimer = 0.08
+            atk.phaseDuration = 0.08
+          } else {
+            atk.phase = 'crash'
+            atk.phaseTimer = 0.36
+            atk.phaseDuration = 0.36
+            atk.x = atk.targetX
+            atk.y = atk.targetY
+            atk.arcY = 0
+            // 落地摆正：把自转角归到整圈，避免鼎镇在地上还是歪的
+            atk.spin = Math.round(atk.spin / (Math.PI * 2)) * Math.PI * 2
+            atk.crashRadius = 18
+            atk.hitEnemies = new Set()
+            if (!isHeadless) sound.crash?.()
+            game.cameraShake = 0.34
+            burst(atk.x, atk.y, '#e69848', 26, 110)
+            burst(atk.x, atk.y, '#ffd479', 14, 62)
+          }
         }
       } else if (atk.phase === 'crash') {
         const prog = 1 - Math.max(0, atk.phaseTimer / atk.phaseDuration)
         atk.crashRadius = 18 + (atk.maxRadius - 18) * prog
+        atk.scale = 1.82 - prog * 0.32   // 落地后微微回弹收势
 
         for (const enemy of game.enemies) {
           const d = Math.hypot(enemy.x - atk.x, enemy.y - atk.y)
@@ -3578,45 +3618,120 @@ function drawSpecialAttacks(ctx) {
       }
     }
 
-    // 2. 九疑重鼎 (Ding)
+    // 2. 九疑重鼎 (Ding)：上抛旋转放大 -> 滞空蓄势 -> 加速下压 -> 落地范围冲击波
     else if (atk.type === 'ding_crush') {
-      if (atk.phase === 'launch') {
-        const prog = 1 - Math.max(0, atk.phaseTimer / atk.phaseDuration)
-        // 地面影子
-        ctx.fillStyle = `rgba(20, 30, 25, ${0.2 + (1 - Math.abs(atk.arcY) / 95) * 0.3})`
-        ctx.beginPath()
-        ctx.ellipse(atk.x, atk.y, 16, 8, 0, 0, Math.PI * 2)
-        ctx.fill()
+      if (atk.phase === 'rise' || atk.phase === 'hang' || atk.phase === 'slam') {
+        const height = Math.max(0, -atk.arcY)
+        const hRatio = atk.apexY > 0 ? Math.min(1, height / atk.apexY) : 0
+        const dingSize = 46 * atk.scale
 
-        // 空中重鼎
-        drawWeaponSpriteOrFallback(ctx, 'ding', atk.x, atk.y + atk.arcY, 0, 48, '#e69848', (c, x, y) => {
-          if (typeof drawDingEntity === 'function') drawDingEntity(c, x, y, 0, 1.3)
+        // 地面投影：飞得越高越小越淡，并随鼎一起变大
+        ctx.save()
+        ctx.fillStyle = `rgba(18, 26, 22, ${0.10 + 0.30 * (1 - hRatio)})`
+        ctx.beginPath()
+        ctx.ellipse(atk.x, atk.y, 15 * atk.scale * (1 - hRatio * 0.45), 7 * atk.scale * (1 - hRatio * 0.45), 0, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+
+        // 下压阶段拉一道竖向气痕，强化"砸下来"的势
+        if (atk.phase === 'slam' && height > 6) {
+          ctx.save()
+          const trail = ctx.createLinearGradient(0, atk.y + atk.arcY, 0, atk.y)
+          trail.addColorStop(0, 'rgba(255, 208, 120, 0.50)')
+          trail.addColorStop(1, 'rgba(230, 152, 72, 0)')
+          ctx.fillStyle = trail
+          ctx.fillRect(atk.x - 12, atk.y + atk.arcY, 24, height)
+          ctx.restore()
+        }
+
+        // 空中重鼎：带自转角 + 逐渐放大的体积
+        drawWeaponSpriteOrFallback(ctx, 'ding', atk.x, atk.y + atk.arcY, atk.spin, dingSize, '#e69848', (c, x, y, a) => {
+          if (typeof drawDingEntity === 'function') {
+            // drawDingEntity 内部对角度有 0.3 倍阻尼；这里在外层套一次完整旋转，
+            // 让矢量回退路径与贴图路径的翻转表现保持一致
+            c.save()
+            c.translate(x, y); c.rotate(a); c.translate(-x, -y)
+            drawDingEntity(c, x, y, 0, dingSize / 44)
+            c.restore()
+          }
         })
       } else if (atk.phase === 'crash') {
         const prog = 1 - Math.max(0, atk.phaseTimer / atk.phaseDuration)
         const alpha = Math.max(0, 1 - prog)
+        const R = atk.crashRadius
 
         ctx.save()
         ctx.translate(atk.x, atk.y)
+
+        // 贴地尘土气浪：压扁的径向渐变，比单纯圆环更有冲击的体积感
+        ctx.save()
+        ctx.scale(1, 0.44)
+        const wave = ctx.createRadialGradient(0, 0, R * 0.55, 0, 0, R)
+        wave.addColorStop(0, 'rgba(255, 205, 120, 0)')
+        wave.addColorStop(0.72, `rgba(240, 170, 90, ${alpha * 0.30})`)
+        wave.addColorStop(1, 'rgba(180, 110, 50, 0)')
+        ctx.fillStyle = wave
+        ctx.beginPath()
+        ctx.arc(0, 0, R, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+
+        // 主冲击环
         ctx.strokeStyle = `rgba(230, 152, 72, ${alpha * 0.9})`
         ctx.lineWidth = 5 * alpha
         ctx.shadowColor = '#e69848'
         ctx.shadowBlur = 18
         ctx.beginPath()
-        ctx.arc(0, 0, atk.crashRadius, 0, Math.PI * 2)
+        ctx.arc(0, 0, R, 0, Math.PI * 2)
         ctx.stroke()
 
-        // 内环铭文
-        ctx.strokeStyle = `rgba(255, 215, 120, ${alpha * 0.6})`
-        ctx.lineWidth = 2 * alpha
+        // 内层余波环 + 外圈淡环，做出层次
+        ctx.shadowBlur = 0
+        ctx.strokeStyle = `rgba(255, 215, 120, ${alpha * 0.65})`
+        ctx.lineWidth = 2.5 * alpha
         ctx.beginPath()
-        ctx.arc(0, 0, atk.crashRadius * 0.6, 0, Math.PI * 2)
+        ctx.arc(0, 0, R * 0.62, 0, Math.PI * 2)
         ctx.stroke()
+
+        ctx.strokeStyle = `rgba(255, 235, 180, ${alpha * 0.26})`
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.arc(0, 0, R * 1.12, 0, Math.PI * 2)
+        ctx.stroke()
+
+        // 地面放射裂纹
+        ctx.strokeStyle = `rgba(255, 190, 110, ${alpha * 0.5})`
+        ctx.lineWidth = 1.8
+        for (let i = 0; i < 12; i++) {
+          const ca = (i / 12) * Math.PI * 2 + 0.26
+          const rr = R * (0.92 + (i % 3) * 0.07)
+          ctx.beginPath()
+          ctx.moveTo(Math.cos(ca) * R * 0.5, Math.sin(ca) * R * 0.5 * 0.46)
+          ctx.lineTo(Math.cos(ca) * rr, Math.sin(ca) * rr * 0.46)
+          ctx.stroke()
+        }
         ctx.restore()
 
-        // 巨鼎镇地
-        drawWeaponSpriteOrFallback(ctx, 'ding', atk.x, atk.y - 10, 0, 46, '#e69848', (c, x, y) => {
-          if (typeof drawDingEntity === 'function') drawDingEntity(c, x, y, 0, 1.35)
+        // 落地初期竖直光柱：只负责那一下的"重"，很快收掉
+        if (prog < 0.35) {
+          const k = 1 - prog / 0.35
+          ctx.save()
+          const col = ctx.createLinearGradient(0, atk.y - 92, 0, atk.y + 6)
+          col.addColorStop(0, 'rgba(255, 220, 140, 0)')
+          col.addColorStop(1, `rgba(255, 220, 140, ${0.5 * k})`)
+          ctx.fillStyle = col
+          ctx.fillRect(atk.x - 16 * k, atk.y - 92, 32 * k, 98)
+          ctx.restore()
+        }
+
+        // 巨鼎镇地（随 scale 收势）
+        drawWeaponSpriteOrFallback(ctx, 'ding', atk.x, atk.y - 10, atk.spin, 46 * atk.scale, '#e69848', (c, x, y, a) => {
+          if (typeof drawDingEntity === 'function') {
+            c.save()
+            c.translate(x, y); c.rotate(a); c.translate(-x, -y)
+            drawDingEntity(c, x, y, 0, (46 * atk.scale) / 44)
+            c.restore()
+          }
         })
       }
     }

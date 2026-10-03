@@ -46,17 +46,22 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 app.whenReady().then(async () => {
   const win = new BrowserWindow({
+    // 关键：必须是 offscreen 渲染。
+    //  - show:false 的普通窗口不会绘制，rAF 被 Chromium 节流：实测等 4s 游戏内只推进 0.17s，
+    //    敌人根本来不及刷出，截不到任何战斗画面（backgroundThrottling:false 也救不了）。
+    //  - show:true 在无交互桌面的环境里会直接卡住（实测挂起 5 分钟无输出）。
+    //  offscreen 既不出窗口、又持续出帧，是唯一稳妥的取帧方式。
     show: false,
     width: 960,
     height: 540,
-    // 必须与 electron/main.cjs 的生产配置保持一致。
-    // nodeIntegration 关闭时渲染进程里没有 process.versions.node，
-    // main.js 顶部的 isHeadless 才会是 false，从而走完整绘制路径。
-    // 若开着 nodeIntegration，isHeadless 会变成 true：
-    // renderScale 退化为 1（画布只有 960x540），且大量特效会被跳过，
-    // 截出来的图不能代表真实观感。
-    webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false },
+    webPreferences: {
+      offscreen: true,
+      nodeIntegration: false,
+      contextIsolation: true,
+      backgroundThrottling: false,
+    },
   })
+  win.webContents.setFrameRate(60)
 
   win.webContents.on('console-message', (e, lvl, msg) => {
     if (lvl >= 2) console.log('[renderer]', msg)
@@ -105,6 +110,23 @@ app.whenReady().then(async () => {
     console.log('角色:', info.char, `(${info.charId})`, '| 法宝:', info.weapon, `(${info.weaponId})`, '| 界面:', info.screen)
 
     await sleep(waitMs)
+
+    // 打印运行时状态：便于判断"画面里没东西"是没刷出来还是没画出来
+    const state = await win.webContents.executeJavaScript(`(() => {
+      const g = window.__gameControls && window.__gameControls.game
+      if (!g) return null
+      return {
+        screen: g.screen, paused: !!g.paused, elapsed: +(g.elapsed || 0).toFixed(2),
+        stage: g.stage, enemies: (g.enemies || []).length, markers: (g.markers || []).length,
+        kills: g.kills, specials: (g.specialAttacks || []).length,
+        weapon: (g.player && g.player.weaponType) || '', attackTimer: +((g.player && g.player.attackTimer) || 0).toFixed(2),
+      }
+    })()`)
+    if (state) {
+      console.log(`状态: 界面=${state.screen} 暂停=${state.paused} 已运行=${state.elapsed}s 关卡=${state.stage} ` +
+        `敌人=${state.enemies} 预兆=${state.markers} 击杀=${state.kills} 特殊攻击=${state.specials} ` +
+        `法宝=${state.weapon} 出招计时=${state.attackTimer}`)
+    }
 
     const canvasSel = screen === 'char-select' ? '#weapon-orbit-canvas' : '#game'
     const size = await win.webContents.executeJavaScript(`(() => {
