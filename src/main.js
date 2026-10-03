@@ -1393,10 +1393,10 @@ const DAMAGE_TEXT_STYLE = {
 }
 
 /**
- * 暴击判定。
- * game.critChance 默认为 0 —— 即**默认不改变任何伤害数值**，纯属留好的接口。
- * 开启后按 game.critMultiplier 放大伤害，并以大号白字呈现。
- * 之所以默认关闭：暴击是会改变数值平衡的机制，倍率与概率应由玩法侧决定。
+ * 暴击判定。默认 15% 概率、1.8 倍伤害（game.critChance / game.critMultiplier 可调）。
+ *
+ * 注意这是**会改变数值平衡**的机制：期望伤害倍率 = 1 + 0.15 × (1.8 - 1) = 1.12，
+ * 即整体 DPS 约提升 12%。若要回到"不影响数值"的状态，把 critChance 设为 0 即可。
  */
 function rollCrit() {
   const chance = (typeof game !== 'undefined' && game && game.critChance) || 0
@@ -6970,19 +6970,22 @@ function damageBoss(amount) {
     }
   }
 
-  const dmg = Math.max(1, Math.round(effectiveAmount))
+  // 暴击判定放在减伤/易伤结算之后。格挡期间（手臂未清）不判暴击，
+  // 否则会出现"被 90% 减伤却跳着暴击白字"的矛盾观感。
+  const crit = hasLivingArms ? { is: false, mult: 1 } : rollCrit()
+  const dmg = Math.max(1, Math.round(effectiveAmount * crit.mult))
   boss.hp -= dmg
   boss.hit = 0.16
 
   if (!isHeadless && typeof spawnHitImpact === 'function') {
-    spawnHitImpact(boss.x, boss.y, hasLivingArms ? '#06d6a0' : '#ffbe0b', 8)
+    spawnHitImpact(boss.x, boss.y, hasLivingArms ? '#06d6a0' : '#ffbe0b', crit.is ? 12 : 8)
   }
 
   spawnDamageNumber(
     boss.x + (Math.random() - 0.5) * 24,
     boss.y - boss.r - 12,
     hasLivingArms ? `${dmg} (格挡90%)` : dmg,
-    'enemy',
+    crit.is ? 'crit' : 'enemy',
     { color: hasLivingArms ? '#2ec4b6' : '#ff9f1c', life: 0.7 }
   )
 
@@ -14345,8 +14348,8 @@ function startRunFromSelection() {
   game.projectiles = []
   game.specialAttacks = []
   game.damageNumbers = []
-  game.critChance = 0        // 暴击率：默认 0，即不改变伤害平衡
-  game.critMultiplier = 1.8
+  game.critChance = 0.15     // 暴击率 15%
+  game.critMultiplier = 1.8  // 暴击伤害 1.8 倍
   game.hurtFlash = 0
   game.showFloatingDamage = true
   game.cameraShake = 0
@@ -16469,7 +16472,7 @@ function startTestLevel(config = {}) {
   game.projectiles = [];
   game.specialAttacks = [];
   game.damageNumbers = [];
-  game.critChance = 0;
+  game.critChance = 0.15;
   game.critMultiplier = 1.8;
   game.hurtFlash = 0;
   game.showFloatingDamage = true;

@@ -104,6 +104,13 @@ const game = gc.game
 const nums = () => game.damageNumbers
 const last = () => nums()[nums().length - 1]
 
+/* ================= 0. 默认数值：15% / 1.8× ================= */
+assert(game.critChance === 0.15, `暴击率默认为 15%（实际 ${game.critChance}）`)
+assert(game.critMultiplier === 1.8, `暴击伤害默认为 1.8 倍（实际 ${game.critMultiplier}）`)
+const expectMult = 1 + 0.15 * (1.8 - 1)
+assert(Math.abs(expectMult - 1.12) < 1e-9,
+  `期望伤害倍率 = 1 + 0.15×0.8 = ${expectMult.toFixed(2)}，即整体 DPS 约 +12%`)
+
 /* ================= 1. 敌方飘字：默认小号、攻击色 ================= */
 game.damageNumbers.length = 0
 const dummy = { x: 300, y: 200, r: 14, hp: 99999, maxHp: 99999, kind: 'wisp' }
@@ -137,6 +144,24 @@ assert(critNum.size === 26, `暴击为大号 26px（实际 ${critNum.size}）`)
 assert(critNum.color === '#ffffff', `暴击为白色（实际 ${critNum.color}）`)
 assert(critNum.pop > 0, '暴击带弹入缩放，视觉上更突出')
 assert(critNum.size > e1.size, `暴击字号 ${critNum.size} 明显大于普通 ${e1.size}`)
+game.critChance = 0
+
+/* ================= 3b. 暴击率统计：1500 次抽样的实际触发比例 ================= */
+game.critChance = 0.15
+game.critMultiplier = 1.8
+{
+  const imm = { x: 300, y: 200, r: 14, hp: 1e9, maxHp: 1e9, kind: 'wisp' }
+  let crits = 0
+  const N = 1500
+  for (let i = 0; i < N; i++) {
+    game.damageNumbers.length = 0
+    gc.damageEnemy(imm, 10, '#ffd166')
+    if (nums()[0] && nums()[0].kind === 'crit') crits++
+  }
+  const rate = crits / N
+  assert(rate > 0.11 && rate < 0.19,
+    `${N} 次抽样实际暴击率 ${(rate * 100).toFixed(1)}%，落在 15% 附近（容许 11%~19%）`)
+}
 game.critChance = 0
 
 /* ================= 4. 角色血量钩子：扣血 -> 红字 + 红晕 + 震动 ================= */

@@ -109,6 +109,15 @@ app.whenReady().then(async () => {
     }
     console.log('角色:', info.char, `(${info.charId})`, '| 法宝:', info.weapon, `(${info.weaponId})`, '| 界面:', info.screen)
 
+    // --crit R：临时覆盖暴击率，便于确定性地截到暴击表现（正式数值默认 15%）
+    const critRate = arg('crit', null)
+    if (critRate !== null) {
+      await win.webContents.executeJavaScript(
+        `(() => { window.__gameControls.game.critChance = ${Number(critRate)}; return true })()`
+      )
+      console.log(`已把暴击率临时覆盖为 ${critRate}`)
+    }
+
     await sleep(waitMs)
 
     // --hurt N：在截图前强制让主角掉 N 点血，用于确定性验证受击飘字/红晕。
