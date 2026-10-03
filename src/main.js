@@ -1378,6 +1378,60 @@ if (!isHeadless) {
 // 仙侠法宝多样化攻击与专属升级系统 (Special Attacks & Upgrades System)
 // ==========================================
 
+/* ---------- 战斗飘字：统一的表现层样式表 ----------
+ * 设计口径（可在此一处调整全局观感）：
+ *   enemy  敌方受击   —— 沿用攻击色，小号，带 "-"
+ *   crit   暴击       —— 大号白字 + 白光晕 + 弹入缩放
+ *   player 角色受击   —— 红色，中号，带红边光晕，左右轻微散开
+ *   heal   回复       —— 绿色，带 "+"
+ */
+const DAMAGE_TEXT_STYLE = {
+  enemy: { size: 13, prefix: '-', pop: 0.0, float: 34, life: 0.65, outline: 2.5 },
+  crit: { size: 26, prefix: '-', pop: 1.0, float: 46, life: 0.95, outline: 3.5, color: '#ffffff' },
+  player: { size: 18, prefix: '-', pop: 0.7, float: 40, life: 0.85, outline: 3.0, color: '#ff4d4f' },
+  heal: { size: 16, prefix: '+', pop: 0.5, float: 44, life: 0.90, outline: 3.0, color: '#4ade80' },
+}
+
+/**
+ * 暴击判定。
+ * game.critChance 默认为 0 —— 即**默认不改变任何伤害数值**，纯属留好的接口。
+ * 开启后按 game.critMultiplier 放大伤害，并以大号白字呈现。
+ * 之所以默认关闭：暴击是会改变数值平衡的机制，倍率与概率应由玩法侧决定。
+ */
+function rollCrit() {
+  const chance = (typeof game !== 'undefined' && game && game.critChance) || 0
+  if (chance > 0 && Math.random() < chance) {
+    return { is: true, mult: (game.critMultiplier || 1.8) }
+  }
+  return { is: false, mult: 1 }
+}
+
+/** 统一的飘字入口。所有战斗飘字都应走这里，避免各处各写一套字号与颜色。 */
+function spawnDamageNumber(x, y, text, kind = 'enemy', opts = {}) {
+  // 与法宝分支同理：headless 下默认不产出表现层对象，
+  // 测试可用 globalThis.__FORCE_VISUAL_FX__ 打开，以便验证飘字的种类/字号/颜色规则。
+  if ((isHeadless && !globalThis.__FORCE_VISUAL_FX__) || typeof game === 'undefined' || !game || !game.damageNumbers) return
+  const st = DAMAGE_TEXT_STYLE[kind] || DAMAGE_TEXT_STYLE.enemy
+  game.damageNumbers.push({
+    x,
+    y,
+    text,
+    kind,
+    // 样式表颜色优先：crit / player / heal 这三种有固定的语义色（白/红/绿），
+    // 不能被调用方按武器传进来的攻击色覆盖；enemy 未定义颜色时才用调用方的。
+    color: st.color || opts.color || null,
+    life: opts.life || st.life,
+    maxLife: opts.life || st.life,
+    size: opts.size || st.size,
+    prefix: opts.prefix !== undefined ? opts.prefix : st.prefix,
+    pop: st.pop,
+    float: st.float,
+    outline: st.outline,
+    // 角色受击时左右散开一点，避免连续受击的飘字完全重叠
+    vx: kind === 'player' ? (Math.random() - 0.5) * 26 : (Math.random() - 0.5) * 18,
+  })
+}
+
 function damageEnemy(enemy, amount, color = '#ffd166') {
   if (!enemy || enemy.hp <= 0) return
   if (typeof recordTestDamage === 'function') {
@@ -1399,7 +1453,8 @@ function damageEnemy(enemy, amount, color = '#ffd166') {
     return
   }
   if (enemy.isBossPart) {
-    const dmg = Math.max(1, Math.round(amount))
+    const crit = rollCrit()
+    const dmg = Math.max(1, Math.round(amount * crit.mult))
     enemy.hp -= dmg
     if (enemy.armRef) {
       enemy.armRef.hp = Math.max(0, enemy.armRef.hp - dmg)
@@ -1407,40 +1462,35 @@ function damageEnemy(enemy, amount, color = '#ffd166') {
     }
     enemy.hit = Math.max(enemy.hit || 0, 0.16)
     if (!isHeadless && typeof spawnHitImpact === 'function') {
-      spawnHitImpact(enemy.x, enemy.y, color || '#06d6a0', 5)
+      spawnHitImpact(enemy.x, enemy.y, color || '#06d6a0', crit.is ? 9 : 5)
     }
-    if (!isHeadless && typeof game !== 'undefined' && game && game.damageNumbers) {
-      game.damageNumbers.push({
-        x: enemy.x + (Math.random() - 0.5) * 16,
-        y: enemy.y - (enemy.r || 12) - 8,
-        text: dmg,
-        color: '#06d6a0',
-        life: 0.65,
-        maxLife: 0.65
-      })
-    }
+    spawnDamageNumber(
+      enemy.x + (Math.random() - 0.5) * 16,
+      enemy.y - (enemy.r || 12) - 8,
+      dmg,
+      crit.is ? 'crit' : 'enemy',
+      { color: '#06d6a0' }
+    )
     if (enemy.hp <= 0) defeat(enemy)
     return
   }
-  const dmg = Math.max(1, Math.round(amount))
-  enemy.hp -= amount
+  const crit = rollCrit()
+  const dmg = Math.max(1, Math.round(amount * crit.mult))
+  enemy.hp -= amount * crit.mult
   if (enemy.isDummy && enemy.immortal) {
     enemy.hp = enemy.maxHp
   }
   enemy.hit = Math.max(enemy.hit || 0, 0.16)
   if (!isHeadless && typeof spawnHitImpact === 'function') {
-    spawnHitImpact(enemy.x, enemy.y, color, 4)
+    spawnHitImpact(enemy.x, enemy.y, color, crit.is ? 9 : 4)
   }
-  if (!isHeadless && typeof game !== 'undefined' && game && game.damageNumbers) {
-    game.damageNumbers.push({
-      x: enemy.x + (Math.random() - 0.5) * 16,
-      y: enemy.y - (enemy.r || 12) - 8,
-      text: dmg,
-      color: color || '#ffd166',
-      life: 0.65,
-      maxLife: 0.65
-    })
-  }
+  spawnDamageNumber(
+    enemy.x + (Math.random() - 0.5) * 16,
+    enemy.y - (enemy.r || 12) - 8,
+    dmg,
+    crit.is ? 'crit' : 'enemy',
+    { color: color || '#ffd166' }
+  )
   if (enemy.hp <= 0) defeat(enemy)
 }
 
@@ -6928,16 +6978,13 @@ function damageBoss(amount) {
     spawnHitImpact(boss.x, boss.y, hasLivingArms ? '#06d6a0' : '#ffbe0b', 8)
   }
 
-  if (!isHeadless && game.damageNumbers) {
-    game.damageNumbers.push({
-      x: boss.x + (Math.random() - 0.5) * 24,
-      y: boss.y - boss.r - 12,
-      text: hasLivingArms ? `${dmg} (格挡90%)` : dmg,
-      color: hasLivingArms ? '#2ec4b6' : '#ff9f1c',
-      life: 0.7,
-      maxLife: 0.7
-    })
-  }
+  spawnDamageNumber(
+    boss.x + (Math.random() - 0.5) * 24,
+    boss.y - boss.r - 12,
+    hasLivingArms ? `${dmg} (格挡90%)` : dmg,
+    'enemy',
+    { color: hasLivingArms ? '#2ec4b6' : '#ff9f1c', life: 0.7 }
+  )
 
   // 血量降为0，转阶段或伏诛
   if (boss.hp <= 0) {
@@ -10755,11 +10802,47 @@ function update(dt) {
   game._currentAttackIsPrimary = false
   if (!isHeadless && typeof updateVFXSystem === 'function') updateVFXSystem(dt)
   if (game.cameraShake > 0) game.cameraShake = Math.max(0, game.cameraShake - dt * 5.0)
+  // 角色血量变化 -> 红/绿飘字与受击/回复特效。
+  // 走"血量钩子"而不是在 7 处扣血点逐个插桩：这样灼烧、毒沼、持续回复、
+  // 拾取回血、卡牌回血等**所有来源**都会被自动覆盖，将来新增伤害源也不会漏。
+  // 按 0.25s 聚合，避免持续伤害每帧刷屏。
+  if (game._prevHp === undefined) game._prevHp = game.hp
+  if (!game._hpFloat) game._hpFloat = { dmg: 0, heal: 0, timer: 0 }
+  if (game.hp !== game._prevHp) {
+    const delta = game._prevHp - game.hp
+    if (delta > 0) game._hpFloat.dmg += delta
+    else game._hpFloat.heal += -delta
+    game._prevHp = game.hp
+    game._hpFloat.timer = 0.25
+  }
+  if (game._hpFloat.timer > 0) {
+    game._hpFloat.timer -= dt
+    if (game._hpFloat.timer <= 0) {
+      const pf = game._hpFloat
+      const px = game.player ? game.player.x : ARENA_WIDTH / 2
+      const py = game.player ? game.player.y : ARENA_HEIGHT / 2
+      if (pf.dmg >= 1) {
+        spawnDamageNumber(px + 8, py - 34, Math.round(pf.dmg), 'player')
+        if (typeof spawnHitImpact === 'function') spawnHitImpact(px, py, '#ff4d4f', 7)
+        if (typeof burst === 'function') burst(px, py, '#ff4d4f', 10, 70)
+        game.hurtFlash = 0.5          // 屏幕四周红晕
+        game.cameraShake = Math.max(game.cameraShake || 0, 0.14)
+      } else if (pf.heal >= 1) {
+        spawnDamageNumber(px - 8, py - 34, Math.round(pf.heal), 'heal')
+        if (typeof burst === 'function') burst(px, py, '#4ade80', 9, 48)
+      }
+      pf.dmg = 0
+      pf.heal = 0
+    }
+  }
+  if (game.hurtFlash > 0) game.hurtFlash = Math.max(0, game.hurtFlash - dt * 1.6)
+
   if (!isHeadless && game.damageNumbers) {
     let dnWrite = 0
     for (let i = 0; i < game.damageNumbers.length; i++) {
       const dn = game.damageNumbers[i]
-      dn.y -= dt * 32
+      dn.y -= dt * (dn.float || 34)
+      if (dn.vx) dn.x += dn.vx * dt
       dn.life -= dt
       if (dn.life > 0) game.damageNumbers[dnWrite++] = dn
     }
@@ -13381,24 +13464,6 @@ function draw() {
     }
   }
 
-  // 绘制浮动伤害飘字
-  if (game.showFloatingDamage !== false && game.damageNumbers && game.damageNumbers.length) {
-    for (const dn of game.damageNumbers) {
-      const alpha = Math.max(0, Math.min(1, dn.life / dn.maxLife))
-      ctx.save()
-      ctx.font = "bold 12px 'Noto Sans SC', sans-serif"
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillStyle = dn.color || '#ffd166'
-      ctx.globalAlpha = alpha
-      ctx.strokeStyle = 'rgba(10, 15, 20, 0.9)'
-      ctx.lineWidth = 2.5
-      ctx.strokeText('-' + dn.text, dn.x, dn.y)
-      ctx.fillText('-' + dn.text, dn.x, dn.y)
-      ctx.restore()
-    }
-  }
-
   // 绘制随行灵兽（青羽灵狐）
   drawPetFox(ctx, game.elapsed)
 
@@ -13428,8 +13493,50 @@ function draw() {
     ctx.restore()
   }
 
+  // 绘制浮动伤害飘字
+  if (game.showFloatingDamage !== false && game.damageNumbers && game.damageNumbers.length) {
+    for (const dn of game.damageNumbers) {
+      const t = 1 - dn.life / dn.maxLife
+      const alpha = Math.max(0, Math.min(1, dn.life / dn.maxLife))
+      // 暴击/受击的弹入：出现瞬间放大再回落，让重击"跳"出来
+      const pop = dn.pop ? 1 + dn.pop * Math.max(0, 1 - t / 0.22) : 1
+      const size = Math.round((dn.size || 13) * pop)
+      ctx.save()
+      ctx.globalAlpha = alpha
+      ctx.font = `bold ${size}px 'Noto Sans SC', sans-serif`
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.lineJoin = 'round'
+      // 深色描边保证在任何底色上都能读清
+      ctx.strokeStyle = 'rgba(8, 12, 16, 0.92)'
+      ctx.lineWidth = (dn.outline || 2.5) * pop
+      if (dn.kind === 'crit') { ctx.shadowColor = 'rgba(255,255,255,0.95)'; ctx.shadowBlur = 16 }
+      else if (dn.kind === 'player') { ctx.shadowColor = 'rgba(255,70,70,0.9)'; ctx.shadowBlur = 11 }
+      else if (dn.kind === 'heal') { ctx.shadowColor = 'rgba(74,222,128,0.85)'; ctx.shadowBlur = 11 }
+      const label = (dn.prefix || '') + dn.text
+      ctx.strokeText(label, dn.x, dn.y)
+      ctx.shadowBlur = 0
+      ctx.fillStyle = dn.color || (dn.kind === 'crit' ? '#ffffff' : '#ffd166')
+      ctx.fillText(label, dn.x, dn.y)
+      ctx.restore()
+    }
+  }
+
   if (game.flash > 0) {
     ctx.fillStyle = `rgba(232, 202, 117, ${game.flash * .28})`
+    ctx.fillRect(0, 0, ARENA_WIDTH, ARENA_HEIGHT)
+  }
+
+  // 角色受击：屏幕四周泛起红晕（比整屏染色克制，不遮挡战场）
+  if (game.hurtFlash > 0) {
+    const k = Math.min(1, game.hurtFlash / 0.5)
+    const hg = ctx.createRadialGradient(
+      ARENA_WIDTH / 2, ARENA_HEIGHT / 2, ARENA_HEIGHT * 0.44,
+      ARENA_WIDTH / 2, ARENA_HEIGHT / 2, ARENA_HEIGHT * 0.92
+    )
+    hg.addColorStop(0, 'rgba(255, 40, 40, 0)')
+    hg.addColorStop(1, `rgba(255, 40, 40, ${0.38 * k})`)
+    ctx.fillStyle = hg
     ctx.fillRect(0, 0, ARENA_WIDTH, ARENA_HEIGHT)
   }
 
@@ -14238,6 +14345,9 @@ function startRunFromSelection() {
   game.projectiles = []
   game.specialAttacks = []
   game.damageNumbers = []
+  game.critChance = 0        // 暴击率：默认 0，即不改变伤害平衡
+  game.critMultiplier = 1.8
+  game.hurtFlash = 0
   game.showFloatingDamage = true
   game.cameraShake = 0
   game._lastShakeTime = 0
@@ -16359,6 +16469,9 @@ function startTestLevel(config = {}) {
   game.projectiles = [];
   game.specialAttacks = [];
   game.damageNumbers = [];
+  game.critChance = 0;
+  game.critMultiplier = 1.8;
+  game.hurtFlash = 0;
   game.showFloatingDamage = true;
   game.cameraShake = 0;
   game._lastShakeTime = 0;

@@ -111,6 +111,20 @@ app.whenReady().then(async () => {
 
     await sleep(waitMs)
 
+    // --hurt N：在截图前强制让主角掉 N 点血，用于确定性验证受击飘字/红晕。
+    // 血量钩子按 0.25s 聚合，因此这里等 0.34s 让飘字结算并渲染出来。
+    const hurt = Number(arg('hurt', 0))
+    if (hurt > 0) {
+      const hpAfter = await win.webContents.executeJavaScript(`(() => {
+        const g = window.__gameControls.game
+        g._prevHp = g.hp
+        g.hp = Math.max(1, g.hp - ${hurt})
+        return g.hp
+      })()`)
+      console.log(`已强制扣血 ${hurt} 点，当前血量 ${hpAfter}`)
+      await sleep(340)
+    }
+
     // 打印运行时状态：便于判断"画面里没东西"是没刷出来还是没画出来
     const state = await win.webContents.executeJavaScript(`(() => {
       const g = window.__gameControls && window.__gameControls.game

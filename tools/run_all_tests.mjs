@@ -19,6 +19,7 @@ const testFiles = [
   'test_corpse_emperor.mjs',
   'test_player_weapon_sheets.mjs',
   'test_ding_crush.mjs',
+  'test_damage_numbers.mjs',
   'verify_asset_paths.mjs'
 ]
 
