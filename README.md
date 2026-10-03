@@ -88,6 +88,16 @@ Get-NetTCPConnection -LocalPort 5173 -State Listen |
 | [`tools/art/artlib.py`](tools/art/artlib.py) | 核心库：抠底、预乘 alpha 重采样、切帧、打包 |
 | [`tools/art/import_art.py`](tools/art/import_art.py) | 通用导入器：AI 出图 → 游戏可用贴图 |
 | [`tools/art/optimize_assets.py`](tools/art/optimize_assets.py) | 按实际绘制尺寸压缩贴图 |
+| [`tools/art/align_frames.py`](tools/art/align_frames.py) | 序列帧网格按头顶锚定对齐 + 逐帧高度归一 |
+| [`tools/capture_frame.cjs`](tools/capture_frame.cjs) | 实装截图验证（战斗内 / 候选大厅） |
+
+截图验证（`npm run art:frame`）：
+
+```bash
+npm run build
+npm run art:frame -- --char spell --weapon spell_fuchen --out shot.png
+npm run art:frame -- --char spell --weapon spell_bagua --screen char-select --out hall.png
+```
 
 **关于贴图分辨率**：游戏画布缓冲区被 `renderScale` 钳制在 1920×1080（最多 2400×1350），
 与显示器是 1080p / 2K / 4K 无关。因此贴图的可用细节上限就是它在 1920×1080 缓冲区里占的像素数，

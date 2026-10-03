@@ -7,10 +7,13 @@
  * 用法:
  *   npm run build
  *   npm run art:frame -- --char spell --weapon spell_fuchen --out shot.png
+ *   npm run art:frame -- --char spell --weapon spell_bagua --screen char-select --out hall.png
  *
  * 参数:
  *   --char   角色 id (sword/spell/body/beast/formation/alchemist/demon/ghost)，默认 spell
  *   --weapon 起手法宝 id (如 spell_fuchen)，默认取该角色第一件
+ *   --screen 截哪个界面：game=战斗内 #game（默认）；char-select=候选大厅
+ *            二级界面「法宝环绕护体效果」的 #weapon-orbit-canvas
  *   --out    输出 PNG，默认 tools/_frame.png
  *   --wait   开始跑关后等待的毫秒数（让法宝绕行到可见角度），默认 1400
  *
@@ -35,6 +38,7 @@ function arg(name, dflt) {
 
 const charId = arg('char', 'spell')
 const weaponId = arg('weapon', null)
+const screen = arg('screen', 'game')   // game | char-select
 const outPath = path.resolve(arg('out', path.join(__dirname, '_frame.png')))
 const waitMs = Number(arg('wait', 1400))
 
@@ -78,7 +82,14 @@ app.whenReady().then(async () => {
       const wi = want ? list.findIndex(w => w.id === want) : 0
       if (wi < 0) return { error: '角色 ' + C.characters[ci].name + ' 没有法宝 ' + want, weapons: list.map(w => w.id) }
       C.setChar(ci, wi)
-      C.startRunFromSelection()
+      if (${JSON.stringify(screen)} === 'char-select') {
+        // 顺序很重要：showScreen('char-select') 内部会把 charSelectStep 重置为 1
+        // 并重新渲染，所以必须先切屏、再切到二级界面，否则画布会被清掉。
+        C.showScreen('char-select')
+        C.setCharSelectStep(2)
+      } else {
+        C.startRunFromSelection()
+      }
       return {
         char: C.characters[ci].name, charId: C.characters[ci].id,
         weapon: list[wi] && list[wi].name, weaponId: list[wi] && list[wi].id,
@@ -95,18 +106,19 @@ app.whenReady().then(async () => {
 
     await sleep(waitMs)
 
+    const canvasSel = screen === 'char-select' ? '#weapon-orbit-canvas' : '#game'
     const size = await win.webContents.executeJavaScript(`(() => {
-      const c = document.querySelector('#game')
+      const c = document.querySelector(${JSON.stringify(canvasSel)})
       return c ? { w: c.width, h: c.height } : null
     })()`)
     if (!size || !size.w) {
-      console.error('FAIL: 找不到 #game 画布')
+      console.error(`FAIL: 找不到画布 ${canvasSel}`)
       app.exit(1)
       return
     }
 
     const dataUrl = await win.webContents.executeJavaScript(
-      `document.querySelector('#game').toDataURL('image/png')`
+      `document.querySelector(${JSON.stringify(canvasSel)}).toDataURL('image/png')`
     )
     fs.mkdirSync(path.dirname(outPath), { recursive: true })
     fs.writeFileSync(outPath, Buffer.from(dataUrl.replace(/^data:image\/png;base64,/, ''), 'base64'))

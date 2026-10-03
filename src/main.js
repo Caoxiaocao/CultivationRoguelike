@@ -13718,30 +13718,37 @@ function startWeaponOrbitAnimation() {
       }
     }
 
-    // 4. 绘制角色本体 (立绘或动作序列帧或矢量模型)
+    // 4. 绘制角色本体 (动作序列帧优先，其次立绘，最后矢量模型)
     ctx.save()
     const charSprite = (typeof charSprites !== 'undefined') ? charSprites[curChar.id] : null
     const charImg = (charSprite && charSprite.loaded && charSprite.img) ? charSprite.img : null
     let drewSheet = false
 
-    if (curChar.id === 'sword' && typeof playerWeaponSheets !== 'undefined') {
-      const curWeapon = (curChar.weapons && curChar.weapons[selectedWeaponIndex]) || (curChar.weapons && curChar.weapons[0]) || {}
-      const wSheet = playerWeaponSheets[curWeapon.id] || playerWeaponSheets[curWeapon.type] || playerWeaponSheets.sword_qingfeng
-      if (wSheet && wSheet.loaded && wSheet.img) {
-        // 在法宝环绕展台中循环演练该法宝的6帧起手与斩击连招
-        const frameIdx = Math.floor((t * 2.8) % 6)
-        const col = frameIdx % (wSheet.cols || 3)
-        const row = Math.floor(frameIdx / (wSheet.cols || 3))
-        const fw = wSheet.frameW || 180
-        const fh = wSheet.frameH || 180
-        const dw = 170
-        const dh = 170
-        ctx.shadowColor = props.glow || 'rgba(100, 232, 203, 0.7)'
-        ctx.shadowBlur = 18
-        ctx.drawImage(wSheet.img, col * fw, row * fh, fw, fh, cx - dw / 2, cy - dh / 2 + bob - 15, dw, dh)
-        drewSheet = true
-      }
+    // 与战斗内保持同一套解析逻辑：统一走 getPlayerWeaponSheet，
+    // 法修等职业才能用到自己的帧集；未登记帧集的职业返回 null 回退立绘。
+    // （原先此处硬编码 curChar.id === 'sword' 并用 sword_qingfeng 兜底，
+    //   导致清虚仙子在候选大厅只显示静态立绘，且兜底会把剑修帧错给别的职业）
+    const previewSheet = (typeof getPlayerWeaponSheet === 'function')
+      ? getPlayerWeaponSheet({ charId: curChar.id, weaponId: curWeapon.id, weaponType: curWeapon.type })
+      : null
+    if (previewSheet && previewSheet.loaded && previewSheet.img) {
+      // 在法宝环绕展台中循环演练该法宝的 6 帧起手与斩击连招
+      const frameIdx = Math.floor((t * 2.8) % 6)
+      const cols = previewSheet.cols || 3
+      const fw = previewSheet.frameW || 180
+      const fh = previewSheet.frameH || 180
+      const dw = 170
+      const dh = 170
+      // 序列帧内角色脚底位于 93% 处，据此把落脚点对到地面法阵上，
+      // 与下面立绘分支的视觉落点保持一致
+      const drawY = cy + 85 - dh * 0.93 + bob
+      ctx.shadowColor = props.glow || 'rgba(100, 232, 203, 0.7)'
+      ctx.shadowBlur = 18
+      ctx.drawImage(previewSheet.img, (frameIdx % cols) * fw, Math.floor(frameIdx / cols) * fh, fw, fh,
+        cx - dw / 2, drawY, dw, dh)
+      drewSheet = true
     }
+
 
     if (!drewSheet) {
       if (charImg) {
