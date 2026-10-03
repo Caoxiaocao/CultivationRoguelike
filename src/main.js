@@ -13733,16 +13733,17 @@ function startWeaponOrbitAnimation() {
       : null
     if (previewSheet && previewSheet.loaded && previewSheet.img) {
       // 在法宝环绕展台中循环演练该法宝的 6 帧起手与斩击连招。
-      // 节奏刻意做成"待机停留 + 连招快放"：帧 0 是待机、帧 1~5 才是起手到收招，
-      // 若对 6 帧做匀速循环（原先 2.8fps，每帧约 357ms），既慢得像幻灯片，
-      // 又把待机和出招混成一串，看不出攻击的爆发感。
-      const IDLE_HOLD = 0.5      // 待机帧停留秒数
-      const ACTION_FPS = 15      // 连招帧率：5 帧约 0.33s，接近战斗内 0.28s 的出招时长
-      const actionSpan = 5 / ACTION_FPS
-      const loopT = t % (IDLE_HOLD + actionSpan)
-      const frameIdx = loopT < IDLE_HOLD
-        ? 0
-        : Math.min(5, 1 + Math.floor((loopT - IDLE_HOLD) * ACTION_FPS))
+      // 节奏取「匀速、中速」：6 帧一圈约 0.86s。
+      //
+      // 两个已踩过的坑：
+      //   过慢 —— 原先匀速 2.8fps（每帧 357ms），观感像幻灯片；
+      //   过快 —— 曾改成"待机停 0.5s + 连招 15fps"，反而变成抽搐。
+      //           原因有二：一是 15fps 会把 AI 出图逐帧之间的细微姿态差异
+      //           放大成抖动；二是"停住再猛放"的顿挫本身就像抽动。
+      // 结论：这套逐帧由 AI 生成、帧间存在细微差异的素材，适合匀速中速。
+      // 可调区间约 5~10fps：调大更利落，调小更从容。
+      const FRAME_FPS = 7
+      const frameIdx = Math.floor(t * FRAME_FPS) % 6
       const cols = previewSheet.cols || 3
       const fw = previewSheet.frameW || 180
       const fh = previewSheet.frameH || 180
