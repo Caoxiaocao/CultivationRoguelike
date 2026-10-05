@@ -130,6 +130,14 @@ app.innerHTML = `<div class="app-shell">
               <span class="boss-hp-val" id="boss-hp-val">1200 / 1200 (100%)</span>
             </div>
           </div>
+          <!-- 领主招式通告横幅 (Cinematic Boss Telegraph Banner) -->
+          <div class="boss-telegraph-banner hidden" id="boss-telegraph-banner">
+            <span class="banner-emblem" id="banner-emblem">⚠️</span>
+            <div class="banner-text">
+              <span class="banner-skill-name" id="banner-skill-name">【虚空黑洞】</span>
+              <span class="banner-skill-hint" id="banner-skill-hint">强引力聚能 · 迅速规避</span>
+            </div>
+          </div>
         </div>
 
         <div class="hud-right">
@@ -6174,6 +6182,7 @@ function onCorpseEmperorArmDestroyed(arm) {
     if (boss.phaseIndex === 0) {
       addLog('【九幽骨盾崩解】白骨尸皇双臂尽毁，护体玄煞破散，头颅防御大幅衰减！速速破敌！', true)
       if (!isHeadless) {
+        showBossTelegraph('骨盾崩解', '尸皇双臂尽毁 · 护体破散全力输出！', '💥')
         game.cameraShake = 0.5
         game.flash = 0.4
         if (typeof sound !== 'undefined' && sound.crash) sound.crash()
@@ -6187,6 +6196,7 @@ function onCorpseEmperorArmDestroyed(arm) {
       boss.cooldowns.melee = 2.5
       addLog('【万骨崩坏 · 三首狂暴】白骨尸皇六臂尽灭！三首融合巨颅彻底暴走，喷吐巨型鬼火与狂暴冲撞！', true)
       if (!isHeadless) {
+        showBossTelegraph('万骨狂暴', '三首巨颅暴走 · 凶威暴涨狂暴冲撞！', '💀')
         game.cameraShake = 0.65
         game.flash = 0.5
         if (typeof sound !== 'undefined') {
@@ -6387,6 +6397,9 @@ function updateCorpseEmperor(boss, dt) {
               arm.slamTarget = { x: game.player.x, y: game.player.y }
               arm.telegraphTimer = 1.05
               arm.maxTelegraph = 1.05
+              if (!isHeadless) {
+                showBossTelegraph('白骨重拍', '巨型骨臂腾空轰击 · 迅速移出红圈', '💀')
+              }
               game.bossAoEs.push({
                 x: arm.slamTarget.x,
                 y: arm.slamTarget.y,
@@ -6693,6 +6706,9 @@ function updateAsuraDemon(boss, dt) {
       // 近战修罗疾掠冲锋
       else if (boss.cooldowns.melee <= 0 && dist < 360) {
         boss.state = 'telegraph_rush'
+        if (!isHeadless) {
+          showBossTelegraph('修罗疾掠', '天魔蓄力突杀 · 迅速横向规避', '👹')
+        }
         boss.rushTarget = { x: game.player.x, y: game.player.y }
         const rdx = game.player.x - boss.x
         const rdy = game.player.y - boss.y
@@ -6807,6 +6823,7 @@ function updateAsuraHexLasers(boss, dt) {
           game.flash = 0.25
           if (typeof sound !== 'undefined' && sound.magic) sound.magic()
           addLog(`【六极崩灭】九天噬魂魔尊坐镇阵眼凝聚六道崩灭神光！即将【${dirText}】旋转，速速寻隙规避！`, true)
+          showBossTelegraph('六极崩灭', `六道灭世神光轮转 · 即将【${dirText}】旋转规避`, '⚡', 3200)
         }
       }
     }
@@ -6991,6 +7008,7 @@ function startAsuraBlackhole(boss) {
       else if (sound.whirlwind) sound.whirlwind()
     }
     addLog('【黑洞聚能】虚空引力正在急剧汇聚！地面预警已锁定，速速逃离法阵！', true)
+    showBossTelegraph('虚空黑洞', '强引力坍缩汇聚 · 迅速脱离中心预警', '🌀')
   }
 }
 
@@ -7534,6 +7552,16 @@ function startTelegraphRush(boss, isMulti = false) {
   if (!isMulti && boss.currentPhase.multiRush) {
     boss.pendingMultiRush = boss.currentPhase.multiRush - 1
   }
+
+  if (!isHeadless) {
+    if (boss.id === 'red_dragon') {
+      showBossTelegraph('蛟龙穿云突', '直线蓄力暴冲 · 垂直走位躲避', '🐉')
+    } else if (boss.id === 'celestial_peng') {
+      showBossTelegraph('九霄金芒冲', '雷霆极速俯冲 · 迅速侧移闪避', '⚡')
+    } else if (boss.id === 'corpse_emperor') {
+      showBossTelegraph('白骨瞬影斩', '幽冥残影突袭 · 迅速脱离直线', '💀')
+    }
+  }
 }
 
 function startCastBarrage(boss) {
@@ -7637,6 +7665,13 @@ function executeBarrageAttack(boss) {
 function startCastAoE(boss) {
   boss.state = 'casting_aoe'
   boss.castTimer = 0.4
+  if (!isHeadless) {
+    if (boss.id === 'red_dragon') {
+      showBossTelegraph('地脉火煞', '熔岩法阵蓄能 · 迅速移出地面红圈', '🔥')
+    } else if (boss.id === 'celestial_peng') {
+      showBossTelegraph('九霄神雷', '连环神雷轰顶 · 保持机动走位', '⚡')
+    }
+  }
 }
 
 function executeAoEAttack(boss) {
@@ -8520,6 +8555,15 @@ function updateBossHudUI() {
   if (!boss || !game.isBossStage) {
     hudBar.classList.add('hidden')
     hudBar.classList.remove('test-mode')
+    const banner = document.querySelector('#boss-telegraph-banner')
+    if (banner) {
+      banner.classList.add('hidden')
+      banner.classList.remove('banner-pulse')
+    }
+    if (bossTelegraphTimeout) {
+      clearTimeout(bossTelegraphTimeout)
+      bossTelegraphTimeout = null
+    }
     return
   }
 
@@ -8553,6 +8597,31 @@ function updateBossHudUI() {
   if (fillEl) fillEl.style.width = `${hpPct}%`
   if (lagEl) lagEl.style.width = `${lagPct}%`
   if (valEl) valEl.textContent = `${curHp} / ${maxHp} (${Math.round(hpPct)}%)`
+}
+
+let bossTelegraphTimeout = null
+function showBossTelegraph(skillName, skillHint, emblem = '⚠️', durationMs = 2800) {
+  if (isHeadless) return
+  const banner = document.querySelector('#boss-telegraph-banner')
+  const nameEl = document.querySelector('#banner-skill-name')
+  const hintEl = document.querySelector('#banner-skill-hint')
+  const emblemEl = document.querySelector('#banner-emblem')
+  if (!banner || !nameEl || !hintEl) return
+
+  nameEl.textContent = `【${skillName}】`
+  hintEl.textContent = skillHint
+  if (emblemEl) emblemEl.textContent = emblem
+
+  banner.classList.remove('hidden')
+  banner.classList.remove('banner-pulse')
+  void banner.offsetWidth
+  banner.classList.add('banner-pulse')
+
+  if (bossTelegraphTimeout) clearTimeout(bossTelegraphTimeout)
+  bossTelegraphTimeout = setTimeout(() => {
+    banner.classList.add('hidden')
+    banner.classList.remove('banner-pulse')
+  }, durationMs)
 }
 
 /* ---------- 领主、法阵与弹幕 Canvas 绘制系统 ---------- */
@@ -13135,6 +13204,74 @@ function showStageOverlay() {
   ui.overlay.classList.remove('hidden')
 }
 
+function getCardStatChips(card) {
+  const chips = []
+  const text = (card.name + ' ' + (card.copy || '') + ' ' + (card.type || '')).toLowerCase()
+
+  if (card.id === 'chain_arc') {
+    chips.push({ text: '⚡ 连锁电弧', cls: 'chip-gold' })
+    chips.push({ text: '🎯 传导 10 目标', cls: 'chip-cyan' })
+  } else if (card.id === 'blazing_fire') {
+    chips.push({ text: '🔥 离火灼烧', cls: 'chip-red' })
+    chips.push({ text: '💥 爆裂溅射', cls: 'chip-amber' })
+  } else if (card.id === 'sword') {
+    chips.push({ text: '⚔️ 剑光伤害 +8', cls: 'chip-gold' })
+    chips.push({ text: '🗡️ 飞剑数量 +1', cls: 'chip-cyan' })
+  } else if (card.id === 'fire') {
+    chips.push({ text: '🔥 炽热火线', cls: 'chip-red' })
+    chips.push({ text: '⏱️ 独立索敌', cls: 'chip-teal' })
+  } else if (card.id === 'formation') {
+    chips.push({ text: '☯️ 回风阵法', cls: 'chip-cyan' })
+    chips.push({ text: '🛡️ 范围击退', cls: 'chip-green' })
+  } else if (card.id === 'pet') {
+    chips.push({ text: '🐾 灵狐出击', cls: 'chip-purple' })
+    chips.push({ text: '💥 范围扑咬', cls: 'chip-red' })
+  } else if (card.id === 'thunder') {
+    chips.push({ text: '⚡ 九天雷符', cls: 'chip-gold' })
+    chips.push({ text: '💥 范围落雷', cls: 'chip-amber' })
+  } else if (card.id === 'body') {
+    chips.push({ text: '❤️ 气血 +30', cls: 'chip-green' })
+    chips.push({ text: '💚 即刻疗伤', cls: 'chip-teal' })
+  } else if (card.id === 'gather') {
+    chips.push({ text: '👁️ 拾取 +45', cls: 'chip-cyan' })
+    chips.push({ text: '⚡ 遁速提升', cls: 'chip-teal' })
+  } else if (card.id === 'haste') {
+    chips.push({ text: '⚡ 遁速提振', cls: 'chip-teal' })
+    chips.push({ text: '⚔️ 攻速 +12%', cls: 'chip-gold' })
+  } else if (card.id === 'meridian') {
+    chips.push({ text: '⚔️ 伤害 +18', cls: 'chip-red' })
+    chips.push({ text: '🩸 气血 -20', cls: 'chip-purple' })
+  } else {
+    if (text.includes('伤害 +')) {
+      const m = text.match(/伤害 \+(\d+)/)
+      chips.push({ text: `⚔️ 伤害 +${m ? m[1] : 4}`, cls: 'chip-gold' })
+    }
+    if (text.includes('范围 +') || text.includes('射程 +')) {
+      const m = text.match(/(?:范围|射程) \+(\d+)/)
+      chips.push({ text: `💥 范围 +${m ? m[1] : 6}`, cls: 'chip-cyan' })
+    }
+    if (text.includes('攻速 +')) {
+      const m = text.match(/攻速 \+(\d+)%/)
+      chips.push({ text: `⚡ 攻速 +${m ? m[1] : 5}%`, cls: 'chip-teal' })
+    }
+    if (text.includes('弹射') || text.includes('连锁')) {
+      chips.push({ text: '⚡ 连锁弹射 +1', cls: 'chip-amber' })
+    }
+    if (text.includes('替换')) {
+      chips.push({ text: '⚠️ 替换现有槽位', cls: 'chip-red' })
+    } else if (text.includes('纳新')) {
+      chips.push({ text: '✨ 纳新槽位', cls: 'chip-green' })
+    } else if (text.includes('升阶')) {
+      chips.push({ text: '📈 升阶蜕变', cls: 'chip-gold' })
+    }
+  }
+
+  if (chips.length === 0) {
+    chips.push({ text: '✦ 天道机缘', cls: 'chip-gold' })
+  }
+
+  return chips.map(c => `<span class="choice-stat-chip ${c.cls}">${c.text}</span>`).join('')
+}
 
 function renderSettlement() {
   const st = game.settlement
@@ -13332,12 +13469,20 @@ function renderSettlement() {
     } else if (card.id === 'blazing_fire') {
       iconHtml = `<div class="choice-icon"><img src="./skill_blazing_fire.png" class="choice-icon-img" alt="${card.name}"></div>`
     }
+    const chipsHtml = getCardStatChips(card)
     return `
     <button class="choice${st.chosen === index ? ' selected' : ''}" data-card="${index}">
-      ${iconHtml}
-      <div class="choice-name">${card.name}</div>
-      <div class="choice-type">${card.type}</div>
-      <div class="choice-copy">${card.copy}</div>
+      <div class="choice-card-inner">
+        <div class="choice-header-row">
+          ${iconHtml}
+          <div class="choice-title-block">
+            <div class="choice-name">${card.name}</div>
+            <div class="choice-type">${card.type}</div>
+          </div>
+        </div>
+        <div class="choice-stat-chips">${chipsHtml}</div>
+        <div class="choice-copy">${card.copy}</div>
+      </div>
     </button>`
   }).join('')
 
@@ -16057,6 +16202,21 @@ function renderCharSelect() {
     const pickVal = curChar.id === 'spell' ? 121 : (curChar.id === 'beast' ? 111 : 86)
     const rngVal = curChar.id === 'spell' ? 170 : (curChar.id === 'formation_master' ? 170 : 140)
 
+    const hpPct = Math.min(100, Math.round((hpVal / 160) * 100))
+    const hpTier = hpVal >= 140 ? '超凡' : (hpVal >= 115 ? '雄厚' : '充沛')
+    const atkPct = Math.min(100, Math.round((atkVal / 30) * 100))
+    const atkTier = atkVal >= 28 ? '绝顶' : (atkVal >= 24 ? '凌厉' : '中正')
+    const spdPct = Math.min(100, Math.round(((spdVal - 200) / 45) * 100))
+    const spdTier = spdVal >= 235 ? '极速' : (spdVal >= 225 ? '轻盈' : '从容')
+    const rngPct = Math.min(100, Math.round((rngVal / 190) * 100))
+    const rngTier = rngVal >= 170 ? '通玄' : (rngVal >= 150 ? '敏锐' : '澄澈')
+
+    const passiveParts = curChar.passiveText.includes('·')
+      ? curChar.passiveText.split('·').map(s => s.trim())
+      : [curChar.passiveText, '']
+    const passiveTitle = passiveParts[0]
+    const passiveDesc = passiveParts.slice(1).join(' · ') || curChar.passiveText
+
     container.innerHTML = `
       <div class="char-step1-container">
         <!-- 上方区域: 动态立绘与基本信息 -->
@@ -16083,40 +16243,56 @@ function renderCharSelect() {
               <div class="char-hero-motto">“${curChar.desc}”</div>
             </div>
 
-            <!-- 本命天赋 -->
+            <!-- 本命天赋精粹 -->
             <div class="char-passive-box">
               <div class="passive-box-title">
                 <span class="passive-icon">✧</span>
-                <span>本命真传 · 灵根特质</span>
+                <span class="passive-name">${passiveTitle}</span>
+                <span class="passive-tag">${curChar.class}真传</span>
               </div>
-              <div class="passive-box-desc">${curChar.passiveText}</div>
+              <div class="passive-box-desc">${passiveDesc}</div>
             </div>
 
-            <!-- 初始底蕴属性 -->
-            <div class="char-stats-grid">
-              <div class="char-stat-card">
-                <span class="stat-label">初始气血</span>
-                <span class="stat-val hp">${hpVal}</span>
+            <!-- 四大道基潜质 (可视化能量条) -->
+            <div class="char-potentials-grid">
+              <div class="char-potential-card">
+                <div class="potential-header">
+                  <span class="pot-lbl">💖 气血根基</span>
+                  <span class="pot-val hp">${hpVal} <small class="pot-tier">${hpTier}</small></span>
+                </div>
+                <div class="pot-meter-track">
+                  <div class="pot-meter-fill hp" style="width: ${hpPct}%;"></div>
+                </div>
               </div>
-              <div class="char-stat-card">
-                <span class="stat-label">基础攻击</span>
-                <span class="stat-val atk">${atkVal}</span>
+
+              <div class="char-potential-card">
+                <div class="potential-header">
+                  <span class="pot-lbl">⚔️ 初始攻伐</span>
+                  <span class="pot-val atk">${atkVal} <small class="pot-tier">${atkTier}</small></span>
+                </div>
+                <div class="pot-meter-track">
+                  <div class="pot-meter-fill atk" style="width: ${atkPct}%;"></div>
+                </div>
               </div>
-              <div class="char-stat-card">
-                <span class="stat-label">身法遁速</span>
-                <span class="stat-val spd">${spdVal} px/s</span>
+
+              <div class="char-potential-card">
+                <div class="potential-header">
+                  <span class="pot-lbl">⚡ 御风遁速</span>
+                  <span class="pot-val spd">${spdVal} <small class="pot-tier">${spdTier}</small></span>
+                </div>
+                <div class="pot-meter-track">
+                  <div class="pot-meter-fill spd" style="width: ${spdPct}%;"></div>
+                </div>
               </div>
-              <div class="char-stat-card">
-                <span class="stat-label">神识拾取</span>
-                <span class="stat-val pick">${pickVal} px</span>
-              </div>
-              <div class="char-stat-card">
-                <span class="stat-label">灵识感知</span>
-                <span class="stat-val rng">${rngVal} px</span>
-              </div>
-              <div class="char-stat-card">
-                <span class="stat-label">起手法宝</span>
-                <span class="stat-val wpn">${curChar.weapons.length} 门本命神兵</span>
+
+              <div class="char-potential-card">
+                <div class="potential-header">
+                  <span class="pot-lbl">👁️ 灵识神念</span>
+                  <span class="pot-val rng">${rngVal} <small class="pot-tier">${rngTier}</small></span>
+                </div>
+                <div class="pot-meter-track">
+                  <div class="pot-meter-fill rng" style="width: ${rngPct}%;"></div>
+                </div>
               </div>
             </div>
 
@@ -16207,6 +16383,13 @@ function renderCharSelect() {
             ${curChar.weapons.map((w, wIdx) => {
               const isAct = wIdx === selectedWeaponIndex
               const s = w.stats || { dmg: 20, spd: '1.2/s', rng: '140px', feat: '独门妙法' }
+              const dmgRank = s.dmg >= 26 ? 5 : (s.dmg >= 20 ? 4 : (s.dmg >= 14 ? 3 : 2))
+              const spdNum = parseFloat(s.spd) || 1.0
+              const spdRank = spdNum >= 1.5 ? 5 : (spdNum >= 1.2 ? 4 : (spdNum >= 0.9 ? 3 : 2))
+              const rngNum = parseInt(s.rng, 10) || 120
+              const rngRank = rngNum >= 145 ? 5 : (rngNum >= 125 ? 4 : (rngNum >= 105 ? 3 : 2))
+              const featBadge = s.feat ? (s.feat.includes('·') ? s.feat.split('·')[1].trim() : s.feat) : '独门神兵'
+
               return `
                 <div class="weapon-select-card${isAct ? ' active' : ''}" data-weapon="${wIdx}">
                   <div class="w-card-left">
@@ -16218,15 +16401,28 @@ function renderCharSelect() {
                   <div class="w-card-body">
                     <div class="w-card-title-row">
                       <span class="w-card-name">${w.name}</span>
-                      <span class="w-card-badge">${w.type}</span>
-                      ${isAct ? '<span class="w-card-chosen-tag">已配装 ✦</span>' : ''}
+                      <span class="w-card-badge">${featBadge}</span>
+                      ${isAct ? '<span class="w-card-chosen-tag">已择定 ✦</span>' : ''}
+                    </div>
+                    <div class="w-card-meters-row">
+                      <div class="w-meter-item" title="单次伤害威能">
+                        <span class="w-meter-lbl">威能</span>
+                        <div class="w-meter-pips atk">${'◆'.repeat(dmgRank)}${'◇'.repeat(5 - dmgRank)}</div>
+                      </div>
+                      <div class="w-meter-item" title="攻击出手频率">
+                        <span class="w-meter-lbl">攻速</span>
+                        <div class="w-meter-pips spd">${'◆'.repeat(spdRank)}${'◇'.repeat(5 - spdRank)}</div>
+                      </div>
+                      <div class="w-meter-item" title="攻击触达范围">
+                        <span class="w-meter-lbl">范围</span>
+                        <div class="w-meter-pips rng">${'◆'.repeat(rngRank)}${'◇'.repeat(5 - rngRank)}</div>
+                      </div>
                     </div>
                     <div class="w-card-desc">${w.desc}</div>
                     <div class="w-card-stats-row">
-                      <span class="w-stat-pill dmg">伤害 <b>${s.dmg}</b></span>
+                      <span class="w-stat-pill dmg">威力 <b>${s.dmg}</b></span>
                       <span class="w-stat-pill spd">攻速 <b>${s.spd}</b></span>
                       <span class="w-stat-pill rng">范围 <b>${s.rng}</b></span>
-                      <span class="w-stat-pill feat">${s.feat}</span>
                     </div>
                   </div>
                 </div>
@@ -17881,8 +18077,19 @@ function renderCodexDetail(item) {
   if (item.tactics) {
     tacticsHtml = `
       <div class="codex-section">
-        <div class="codex-sec-title">💡 实战妙用与心得</div>
+        <div class="codex-sec-title">💡 实战妙用与要诀</div>
         <div class="codex-sec-desc">${item.tactics}</div>
+      </div>
+    `;
+  }
+
+  let threatHtml = '';
+  if (currentCodexCat === 'bosses') {
+    threatHtml = `
+      <div class="codex-threat-banner">
+        <span class="threat-stars">★★★★★</span>
+        <span class="threat-label">极度危险 · 秘境领主</span>
+        <span class="threat-hint">多阶段机制 · 附带致命范围法阵</span>
       </div>
     `;
   }
@@ -17902,16 +18109,17 @@ function renderCodexDetail(item) {
         </div>
       </div>
 
-      <div class="codex-section">
-        <div class="codex-sec-title">📜 溯源典故</div>
-        <div class="codex-lore-text">${item.lore || '此乃秘境天成之物，玄妙莫测。'}</div>
-      </div>
-
+      ${threatHtml}
       ${effectHtml}
+      ${tacticsHtml}
       ${statsHtml}
       ${weaponsHtml}
       ${upgradeHtml}
-      ${tacticsHtml}
+
+      <div class="codex-section lore-section">
+        <div class="codex-sec-title">📜 溯源典故</div>
+        <div class="codex-lore-text">${item.lore || '此乃秘境天成之物，玄妙莫测。'}</div>
+      </div>
     </div>
   `;
 }
@@ -19575,6 +19783,7 @@ if (typeof window !== 'undefined') {
     updateCharStatusHUD,
     updateWeaponSlotHUD,
     renderSettlement,
+    showStageOverlay,
     cards,
     startTestLevel,
     exitTestLevel,
