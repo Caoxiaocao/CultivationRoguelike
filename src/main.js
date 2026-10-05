@@ -6000,6 +6000,42 @@ let effectAsuraSoulLoaded = false
 let effectAsuraBlackholeImg = null
 let effectAsuraBlackholeLoaded = false
 
+// 巡天金翅大鹏专属三套 24 帧动作序列帧
+let bossPengRushSheetImg = null
+let bossPengRushSheetLoaded = false
+let bossPengFeatherSheetImg = null
+let bossPengFeatherSheetLoaded = false
+let bossPengScreechSheetImg = null
+let bossPengScreechSheetLoaded = false
+
+// 巡天金翅大鹏专属太乙金羽剑雨飞刃与九霄神雷特效贴图
+let effectPengFeatherImg = null
+let effectPengFeatherLoaded = false
+let effectPengThunderArrayImg = null
+let effectPengThunderArrayLoaded = false
+let effectPengThunderStrikeImg = null
+let effectPengThunderStrikeLoaded = false
+
+// 混沌太虚道祖专属四套 24 帧动作序列帧
+let bossPrimordialWhiskSheetImg = null
+let bossPrimordialWhiskSheetLoaded = false
+let bossPrimordialScrollSheetImg = null
+let bossPrimordialScrollSheetLoaded = false
+let bossPrimordialSingularitySheetImg = null
+let bossPrimordialSingularitySheetLoaded = false
+let bossPrimordialRushSheetImg = null
+let bossPrimordialRushSheetLoaded = false
+
+// 混沌太虚道祖专属特效贴图（太虚八卦雷盘、九天玄刹天劫雷爆、太虚裂空星刃、混沌太极玄珠）
+let effectPrimordialThunderArrayImg = null
+let effectPrimordialThunderArrayLoaded = false
+let effectPrimordialThunderStrikeImg = null
+let effectPrimordialThunderStrikeLoaded = false
+let effectPrimordialBladeImg = null
+let effectPrimordialBladeLoaded = false
+let effectPrimordialOrbImg = null
+let effectPrimordialOrbLoaded = false
+
 if (typeof Image !== 'undefined') {
   bossRedDragonImg = new Image()
   bossRedDragonImg.src = './boss_red_dragon.png'
@@ -6056,6 +6092,62 @@ if (typeof Image !== 'undefined') {
   effectAsuraBlackholeImg = new Image()
   effectAsuraBlackholeImg.src = './effect_asura_blackhole.png'
   effectAsuraBlackholeImg.onload = () => { effectAsuraBlackholeLoaded = true }
+
+  bossPengRushSheetImg = new Image()
+  bossPengRushSheetImg.src = './boss_peng_rush_sheet.png'
+  bossPengRushSheetImg.onload = () => { bossPengRushSheetLoaded = true }
+
+  bossPengFeatherSheetImg = new Image()
+  bossPengFeatherSheetImg.src = './boss_peng_feather_sheet.png'
+  bossPengFeatherSheetImg.onload = () => { bossPengFeatherSheetLoaded = true }
+
+  bossPengScreechSheetImg = new Image()
+  bossPengScreechSheetImg.src = './boss_peng_screech_sheet.png'
+  bossPengScreechSheetImg.onload = () => { bossPengScreechSheetLoaded = true }
+
+  effectPengFeatherImg = new Image()
+  effectPengFeatherImg.src = './effect_peng_feather.png'
+  effectPengFeatherImg.onload = () => { effectPengFeatherLoaded = true }
+
+  effectPengThunderArrayImg = new Image()
+  effectPengThunderArrayImg.src = './effect_peng_thunder_array.png'
+  effectPengThunderArrayImg.onload = () => { effectPengThunderArrayLoaded = true }
+
+  effectPengThunderStrikeImg = new Image()
+  effectPengThunderStrikeImg.src = './effect_peng_thunder_strike.png'
+  effectPengThunderStrikeImg.onload = () => { effectPengThunderStrikeLoaded = true }
+
+  bossPrimordialWhiskSheetImg = new Image()
+  bossPrimordialWhiskSheetImg.src = './boss_primordial_whisk_sheet.png'
+  bossPrimordialWhiskSheetImg.onload = () => { bossPrimordialWhiskSheetLoaded = true }
+
+  bossPrimordialScrollSheetImg = new Image()
+  bossPrimordialScrollSheetImg.src = './boss_primordial_scroll_sheet.png'
+  bossPrimordialScrollSheetImg.onload = () => { bossPrimordialScrollSheetLoaded = true }
+
+  bossPrimordialSingularitySheetImg = new Image()
+  bossPrimordialSingularitySheetImg.src = './boss_primordial_singularity_sheet.png'
+  bossPrimordialSingularitySheetImg.onload = () => { bossPrimordialSingularitySheetLoaded = true }
+
+  bossPrimordialRushSheetImg = new Image()
+  bossPrimordialRushSheetImg.src = './boss_primordial_rush_sheet.png'
+  bossPrimordialRushSheetImg.onload = () => { bossPrimordialRushSheetLoaded = true }
+
+  effectPrimordialThunderArrayImg = new Image()
+  effectPrimordialThunderArrayImg.src = './effect_primordial_thunder_array.png'
+  effectPrimordialThunderArrayImg.onload = () => { effectPrimordialThunderArrayLoaded = true }
+
+  effectPrimordialThunderStrikeImg = new Image()
+  effectPrimordialThunderStrikeImg.src = './effect_primordial_thunder_strike.png'
+  effectPrimordialThunderStrikeImg.onload = () => { effectPrimordialThunderStrikeLoaded = true }
+
+  effectPrimordialBladeImg = new Image()
+  effectPrimordialBladeImg.src = './effect_primordial_blade.png'
+  effectPrimordialBladeImg.onload = () => { effectPrimordialBladeLoaded = true }
+
+  effectPrimordialOrbImg = new Image()
+  effectPrimordialOrbImg.src = './effect_primordial_orb.png'
+  effectPrimordialOrbImg.onload = () => { effectPrimordialOrbLoaded = true }
 }
 
 /* ---------- 领主状态与生成逻辑 ---------- */
@@ -7148,9 +7240,72 @@ function spawnBoss(config) {
       totalFrames: 8,
       fps: 8.5,
       loop: true
+    }) : (config.id === 'celestial_peng' && typeof SpriteSheetAnimation !== 'undefined' && bossPengScreechSheetImg) ? new SpriteSheetAnimation({
+      img: bossPengScreechSheetImg,
+      frameW: 256,
+      frameH: 256,
+      cols: 6,
+      rows: 4,
+      totalFrames: 24,
+      fps: 12,
+      loop: true
+    }) : (config.id === 'primordial_god' && typeof SpriteSheetAnimation !== 'undefined' && bossPrimordialWhiskSheetImg) ? new SpriteSheetAnimation({
+      img: bossPrimordialWhiskSheetImg,
+      frameW: 256,
+      frameH: 256,
+      cols: 6,
+      rows: 4,
+      totalFrames: 24,
+      fps: 16,
+      loop: true
     }) : null,
     arms: [],
     isBerserk: false
+  }
+
+  if (config.id === 'primordial_god' && typeof SpriteSheetAnimation !== 'undefined') {
+    boss.primordialAnims = {
+      whisk: (typeof bossPrimordialWhiskSheetLoaded !== 'undefined' && bossPrimordialWhiskSheetLoaded && bossPrimordialWhiskSheetImg) ? new SpriteSheetAnimation({
+        img: bossPrimordialWhiskSheetImg,
+        frameW: 256,
+        frameH: 256,
+        cols: 6,
+        rows: 4,
+        totalFrames: 24,
+        fps: 16,
+        loop: true
+      }) : null,
+      scroll: (typeof bossPrimordialScrollSheetLoaded !== 'undefined' && bossPrimordialScrollSheetLoaded && bossPrimordialScrollSheetImg) ? new SpriteSheetAnimation({
+        img: bossPrimordialScrollSheetImg,
+        frameW: 256,
+        frameH: 256,
+        cols: 6,
+        rows: 4,
+        totalFrames: 24,
+        fps: 15,
+        loop: true
+      }) : null,
+      singularity: (typeof bossPrimordialSingularitySheetLoaded !== 'undefined' && bossPrimordialSingularitySheetLoaded && bossPrimordialSingularitySheetImg) ? new SpriteSheetAnimation({
+        img: bossPrimordialSingularitySheetImg,
+        frameW: 256,
+        frameH: 256,
+        cols: 6,
+        rows: 4,
+        totalFrames: 24,
+        fps: 16,
+        loop: true
+      }) : null,
+      rush: (typeof bossPrimordialRushSheetLoaded !== 'undefined' && bossPrimordialRushSheetLoaded && bossPrimordialRushSheetImg) ? new SpriteSheetAnimation({
+        img: bossPrimordialRushSheetImg,
+        frameW: 256,
+        frameH: 256,
+        cols: 6,
+        rows: 4,
+        totalFrames: 24,
+        fps: 20,
+        loop: true
+      }) : null
+    }
   }
 
   // 确保领主战开场玩家居于安全下半区并享有2秒无敌保护，彻底杜绝出场重叠接触伤害
@@ -7269,12 +7424,33 @@ function updateBoss(dt) {
   boss.hit = Math.max(0, boss.hit - dt)
 
   // 领主序列帧动画平滑更新与状态自适应调速
+  if (boss.pengAnims) {
+    const isRushing = boss.state === 'rushing' || boss.state === 'telegraph_rush'
+    const isBarrage = boss.state === 'casting_barrage'
+    const curAnim = isRushing ? boss.pengAnims.rush : (isBarrage ? boss.pengAnims.feather : boss.pengAnims.screech)
+    if (curAnim) curAnim.update(dt)
+  }
+  if (boss.primordialAnims) {
+    const isRushing = boss.state === 'rushing' || boss.state === 'telegraph_rush'
+    const isBarrage = boss.state === 'casting_barrage'
+    const isAoE = boss.state === 'casting_aoe'
+    const isSingularity = boss.state === 'singularity' || boss.state === 'casting_singularity'
+    const curAnim = isRushing
+      ? boss.primordialAnims.rush
+      : (isSingularity
+        ? boss.primordialAnims.singularity
+        : (isAoE
+          ? boss.primordialAnims.scroll
+          : boss.primordialAnims.whisk))
+    if (curAnim) curAnim.update(dt)
+  }
   if (boss.sheetAnim) {
     const isEnraged = boss.phaseIndex >= 1
     const isAction = boss.state === 'rushing' || boss.state === 'telegraph_rush' ||
       boss.state === 'casting_barrage' || boss.state === 'casting_aoe' || boss.state === 'casting_blackhole' ||
+      boss.state === 'casting_singularity' ||
       boss.laserState === 'telegraph' || boss.laserState === 'firing' || boss.laserState === 'moving_to_center'
-    boss.sheetAnim.fps = isAction ? 13.5 : (isEnraged ? 10.5 : 8.5)
+    boss.sheetAnim.fps = isAction ? 14 : (isEnraged ? 11 : 9)
     boss.sheetAnim.update(dt)
   }
 
@@ -7345,6 +7521,9 @@ function updateBoss(dt) {
     boss.cooldowns.melee -= dt
     boss.cooldowns.barrage -= dt
     boss.cooldowns.aoe -= dt
+    if (boss.id === 'primordial_god' && boss.cooldowns.singularity !== undefined) {
+      boss.cooldowns.singularity -= dt
+    }
 
     const dx = game.player.x - boss.x
     const dy = game.player.y - boss.y
@@ -7371,7 +7550,11 @@ function updateBoss(dt) {
     clampBossPosition(boss)
     updateBossSegments(boss, dt)
 
-    // 攻击决策优先顺序：近战突袭 -> 范围法阵 -> 弹幕齐射
+    // 攻击决策优先顺序：终极奇点坍缩 -> 近战突袭 -> 范围法阵 -> 弹幕齐射
+    if (boss.id === 'primordial_god' && boss.currentPhase.singularity && (boss.cooldowns.singularity === undefined || boss.cooldowns.singularity <= 0)) {
+      startCastSingularity(boss)
+      return
+    }
     if (boss.cooldowns.melee <= 0 && dist < 380) {
       startTelegraphRush(boss)
       return
@@ -7508,6 +7691,42 @@ function updateBoss(dt) {
     }
     return
   }
+
+  // 7. 混沌太虚道祖专属：混沌归元 · 太极黑洞引力坍缩 (casting_singularity)
+  if (boss.state === 'casting_singularity') {
+    boss.castTimer -= dt
+    updateBossSegments(boss, dt)
+
+    // 混沌太极黑洞向心强力牵引玩家
+    if (game.player && !boss.defeated) {
+      const dx = boss.x - game.player.x
+      const dy = boss.y - game.player.y
+      const dist = Math.hypot(dx, dy) || 1
+      if (dist > 45 && dist < 540) {
+        const pull = (1 - dist / 540) * (boss.phaseIndex >= 2 ? 180 : 140) * dt
+        game.player.x += (dx / dist) * pull
+        game.player.y += (dy / dist) * pull
+      }
+    }
+
+    // 周期性释放太极引力脉冲
+    boss.singularityPulseTimer = (boss.singularityPulseTimer || 0) - dt
+    if (boss.singularityPulseTimer <= 0) {
+      boss.singularityPulseTimer = 0.35
+      if (!isHeadless) {
+        if (typeof sound !== 'undefined' && sound.singularity) sound.singularity()
+      }
+      burst(boss.x, boss.y, '#4cc9f0', 10, 80)
+      burst(boss.x, boss.y, '#7209b7', 8, 65)
+    }
+
+    if (boss.castTimer <= 0) {
+      executeSingularityBurst(boss)
+      boss.state = 'idle'
+      boss.cooldowns.singularity = boss.phaseIndex >= 2 ? 6.5 : 8.5
+    }
+    return
+  }
 }
 
 function clampBossPosition(boss) {
@@ -7625,6 +7844,7 @@ function executeBarrageAttack(boss) {
     for (let i = 0; i < count; i++) {
       const angle = baseAngle - spread / 2 + (spread / count) * i + (Math.random() - 0.5) * 0.08
       game.bossProjectiles.push({
+        bossId: 'celestial_peng',
         x: boss.x,
         y: boss.y,
         vx: Math.cos(angle) * 310,
@@ -7632,7 +7852,7 @@ function executeBarrageAttack(boss) {
         r: 6,
         damage: boss.damage * 0.55,
         color: '#ffb703',
-        glowColor: '#ffffff',
+        glowColor: '#d97706',
         life: 2.0,
         maxLife: 2.0,
         type: 'feather'
@@ -7640,21 +7860,29 @@ function executeBarrageAttack(boss) {
     }
     if (!isHeadless && typeof sound !== 'undefined' && sound.enemyShoot) sound.enemyShoot('feather')
   } else if (boss.id === 'primordial_god') {
-    // 混沌太虚道祖：旋转阴阳混沌星辰弹与太虚诛仙剑雨
+    // 混沌太虚道祖：拂尘裂空 · 太虚诛仙星刃与阴阳混沌道珠
+    const isEnraged = boss.phaseIndex >= 1
+    const isFinalPhase = boss.phaseIndex >= 2
+
+    // 扇形主向挥斩 + 环形星宿飞刃
+    const spread = Math.PI * (isFinalPhase ? 0.85 : (isEnraged ? 0.65 : 0.45))
+    const startAngle = baseAngle - spread / 2
     for (let i = 0; i < count; i++) {
-      const spinAngle = (i / count) * Math.PI * 2 + (boss.animTimer * 2.5)
-      const isBlade = boss.phaseIndex >= 2 || (i % 2 === 0)
+      const angle = startAngle + (spread / Math.max(1, count - 1)) * i + Math.sin(i * 1.5) * 0.08
+      const isBlade = isFinalPhase || (i % 2 === 0)
+      const speed = isBlade ? (isFinalPhase ? 330 : 280) : (isFinalPhase ? 260 : 220)
       game.bossProjectiles.push({
+        bossId: boss.id,
         x: boss.x,
         y: boss.y,
-        vx: Math.cos(spinAngle) * (isBlade ? 280 : 220),
-        vy: Math.sin(spinAngle) * (isBlade ? 280 : 220),
-        r: isBlade ? 7 : 9,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        r: isBlade ? 7.5 : 9.5,
         damage: boss.damage * 0.65,
         color: i % 2 === 0 ? '#4cc9f0' : '#f72585',
         glowColor: '#ffd700',
-        life: 2.8,
-        maxLife: 2.8,
+        life: 3.0,
+        maxLife: 3.0,
         type: isBlade ? 'cosmic_blade' : 'yin_yang_orb'
       })
     }
@@ -7670,13 +7898,120 @@ function startCastAoE(boss) {
       showBossTelegraph('地脉火煞', '熔岩法阵蓄能 · 迅速移出地面红圈', '🔥')
     } else if (boss.id === 'celestial_peng') {
       showBossTelegraph('九霄神雷', '连环神雷轰顶 · 保持机动走位', '⚡')
+    } else if (boss.id === 'primordial_god') {
+      showBossTelegraph('九天玄刹', '真卷启灵引动玄刹神雷 · 迅速离开虚空雷劫阵眼', '⚡')
     }
+  }
+}
+
+function startCastSingularity(boss) {
+  boss.state = 'casting_singularity'
+  boss.castTimer = 1.9
+  boss.singularityPulseTimer = 0.1
+  if (!isHeadless) {
+    showBossTelegraph('混沌归元', '太极黑洞引力坍缩 · 抵抗狂暴吸力远离奇点', '🌌')
+    if (typeof sound !== 'undefined' && sound.singularity) sound.singularity()
+  }
+}
+
+function executeSingularityBurst(boss) {
+  game.cameraShake = 0.45
+  if (typeof pulseGamepad === 'function') pulseGamepad(0.7, 0.85, 320)
+  burst(boss.x, boss.y, '#4cc9f0', 28, 140)
+  burst(boss.x, boss.y, '#f72585', 22, 120)
+  burst(boss.x, boss.y, '#ffd700', 18, 95)
+
+  // 奇点坍缩爆发：向四周辐射 16~20 枚太虚诛仙星刃与阴阳混沌珠
+  const count = boss.phaseIndex >= 2 ? 20 : 16
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2
+    const speed = 250
+    game.bossProjectiles.push({
+      bossId: boss.id,
+      x: boss.x,
+      y: boss.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: 8.5,
+      damage: boss.damage * 0.85,
+      color: i % 2 === 0 ? '#4cc9f0' : '#f72585',
+      glowColor: '#ffd700',
+      life: 2.8,
+      maxLife: 2.8,
+      type: i % 2 === 0 ? 'cosmic_blade' : 'yin_yang_orb'
+    })
+  }
+
+  // 处于奇点核心近距的玩家承受重创
+  if (game.player) {
+    const d = distance(boss, game.player)
+    if (d < boss.r * 2.6 && !game.player.invuln) {
+      const dmg = Math.round(boss.damage * 0.95)
+      game.hp -= dmg
+      game.player.invuln = 0.8
+      burst(game.player.x, game.player.y, '#f72585', 12, 70)
+      addLog(`道友被太极黑洞引力坍缩核心吞噬，受到 ${dmg} 点混沌归元伤害！`)
+      if (game.hp <= 0) endRun()
+    }
+  }
+}
+
+function executePrimordialAoE(boss) {
+  const count = boss.currentPhase.aoeCount || 6
+  const aoeRadius = boss.currentPhase.aoeRadius || 80
+
+  // 必定在玩家脚下生成 1 个雷劫阵眼
+  game.bossAoEs.push({
+    bossId: boss.id,
+    type: 'primordial_thunder',
+    x: game.player.x,
+    y: game.player.y,
+    r: aoeRadius,
+    telegraphTimer: 1.0,
+    maxTelegraph: 1.0,
+    activeTimer: 0.5,
+    maxActive: 0.5,
+    damage: boss.damage * 1.25,
+    color: '#4cc9f0',
+    secondaryColor: '#f72585',
+    isPrimordialThunder: true,
+    spawnHazardOnExplode: boss.phaseIndex >= 1,
+    exploded: false
+  })
+
+  // 其余散落在玩家周边或战场
+  for (let i = 1; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + Math.random() * 0.4
+    const dist = 80 + Math.random() * 150
+    const tx = Math.max(60, Math.min(ARENA_WIDTH - 60, game.player.x + Math.cos(angle) * dist))
+    const ty = Math.max(60, Math.min(ARENA_HEIGHT - 60, game.player.y + Math.sin(angle) * dist))
+    game.bossAoEs.push({
+      bossId: boss.id,
+      type: 'primordial_thunder',
+      x: tx,
+      y: ty,
+      r: aoeRadius,
+      telegraphTimer: 1.0 + (i % 3) * 0.15,
+      maxTelegraph: 1.0 + (i % 3) * 0.15,
+      activeTimer: 0.5,
+      maxActive: 0.5,
+      damage: boss.damage * 1.25,
+      color: '#4cc9f0',
+      secondaryColor: '#f72585',
+      isPrimordialThunder: true,
+      spawnHazardOnExplode: boss.phaseIndex >= 1,
+      exploded: false
+    })
   }
 }
 
 function executeAoEAttack(boss) {
   if (boss.id === 'asura_demon') {
     spawnAsuraBlackhole(boss)
+    return
+  }
+  if (boss.id === 'primordial_god') {
+    executePrimordialAoE(boss)
     return
   }
   const count = boss.currentPhase.aoeCount || 3
@@ -7897,6 +8232,42 @@ function updateBossProjectiles(dt) {
         vy: -proj.vy * 0.1 + (Math.random() - 0.5) * 20,
         life: 0.25,
         color: Math.random() < 0.5 ? '#06d6a0' : '#2ec4b6'
+      })
+    }
+
+    // 巡天大鹏太乙金羽微弱纯阳金屑拖尾 (零GC微量星屑，在尾羽后方飞散，不遮盖飞刃剑体本体)
+    if (proj.type === 'feather' && !isHeadless && Math.random() < 0.28 && game.particles && game.particles.length < 90) {
+      game.particles.push({
+        x: proj.x - (proj.vx / 310) * 16 + (Math.random() - 0.5) * 4,
+        y: proj.y - (proj.vy / 310) * 16 + (Math.random() - 0.5) * 4,
+        vx: -proj.vx * 0.08 + (Math.random() - 0.5) * 10,
+        vy: -proj.vy * 0.08 + (Math.random() - 0.5) * 10,
+        life: 0.16,
+        color: Math.random() < 0.6 ? '#ffb703' : '#ffd166'
+      })
+    }
+
+    // 混沌太虚道祖：太虚裂空星刃 (虚空微晶与星辉粒子拖尾)
+    if (proj.type === 'cosmic_blade' && !isHeadless && Math.random() < 0.32 && game.particles && game.particles.length < 90) {
+      game.particles.push({
+        x: proj.x - (proj.vx / 300) * 14 + (Math.random() - 0.5) * 4,
+        y: proj.y - (proj.vy / 300) * 14 + (Math.random() - 0.5) * 4,
+        vx: -proj.vx * 0.08 + (Math.random() - 0.5) * 12,
+        vy: -proj.vy * 0.08 + (Math.random() - 0.5) * 12,
+        life: 0.2,
+        color: Math.random() < 0.6 ? '#4cc9f0' : '#ffd166'
+      })
+    }
+
+    // 混沌太虚道祖：混沌太极玄珠 (太极吸积暗物质与深紫星芒拖尾)
+    if (proj.type === 'yin_yang_orb' && !isHeadless && Math.random() < 0.32 && game.particles && game.particles.length < 90) {
+      game.particles.push({
+        x: proj.x + (Math.random() - 0.5) * 6,
+        y: proj.y + (Math.random() - 0.5) * 6,
+        vx: -proj.vx * 0.06 + (Math.random() - 0.5) * 14,
+        vy: -proj.vy * 0.06 + (Math.random() - 0.5) * 14,
+        life: 0.22,
+        color: Math.random() < 0.5 ? '#7209b7' : '#f72585'
       })
     }
 
@@ -8184,12 +8555,16 @@ function updateBossAoEs(dt) {
         aoe.tickTimer = 0
         const dPlayer = Math.hypot(game.player.x - aoe.x, Math.max(game.player.y - 16, Math.min(game.player.y, aoe.y)) - aoe.y)
         if (dPlayer < aoe.r + game.player.r && (game.player.invuln <= 0 || game.player.invuln <= 0.25) && !game.testGodMode) {
-          const dmg = Math.max(2, Math.round(game.maxHp * 0.025))
+          if (aoe.isVoidRift) {
+            game.playerChillSlow = Math.max(game.playerChillSlow || 0, 0.35)
+            game.playerChillTimer = Math.max(game.playerChillTimer || 0, 0.45)
+          }
+          const dmg = Math.max(2, Math.round(game.maxHp * (aoe.isVoidRift ? 0.03 : 0.025)))
           game.hp -= dmg
           game.player.invuln = 0.22
           if (typeof sound !== 'undefined' && sound.playerHurt) sound.playerHurt('dot')
-          burst(game.player.x, game.player.y - 8, '#06d6a0', 5, 35)
-          addLog(`【鬼火灼魂】陷入幽冥地火毒沼，受到 ${dmg} 点持续煞气伤害！`)
+          burst(game.player.x, game.player.y - 8, aoe.isVoidRift ? '#7209b7' : '#06d6a0', 5, 35)
+          addLog(aoe.isVoidRift ? `【虚空裂隙】踏入虚空雷劫残留裂隙，受到 ${dmg} 点撕裂伤害！` : `【鬼火灼魂】陷入幽冥地火毒沼，受到 ${dmg} 点持续煞气伤害！`)
           if (game.hp <= 0) {
             endRun()
             return
@@ -8210,6 +8585,24 @@ function updateBossAoEs(dt) {
           else if (sound.slam) sound.slam()
         }
         burst(aoe.x, aoe.y, aoe.secondaryColor, 18, 90)
+
+        // 混沌太虚道祖神雷爆裂后遗留虚空裂隙沼泽
+        if (aoe.spawnHazardOnExplode) {
+          game.bossAoEs.push({
+            bossId: 'primordial_god',
+            type: 'primordial_void_rift',
+            x: aoe.x,
+            y: aoe.y,
+            r: aoe.r * 0.75,
+            activeTimer: 2.2,
+            maxActive: 2.2,
+            damage: aoe.damage * 0.25,
+            isHazardPool: true,
+            isVoidRift: true,
+            color: '#7209b7',
+            secondaryColor: '#4cc9f0'
+          })
+        }
       }
 
       // 判定法阵爆发伤害：在 activeTimer (0.55s) 整个火柱冲天持续期内均有效，命中一次后标记 hitPlayer
@@ -8869,6 +9262,40 @@ function drawBossAoEs(ctx) {
     }
 
     if (aoe.isHazardPool) {
+      if (aoe.isVoidRift) {
+        ctx.translate(aoe.x, aoe.y)
+        const maxLife = aoe.maxActive || 2.2
+        const timeLeft = Math.max(0, aoe.activeTimer)
+        const alpha = Math.min(1.0, timeLeft / 0.4)
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.globalAlpha = alpha * 0.72
+        ctx.rotate((aoe.spin || 0) + game.elapsed * 0.6)
+        const hGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, aoe.r)
+        hGrad.addColorStop(0, '#7209b7')
+        hGrad.addColorStop(0.5, 'rgba(76, 201, 240, 0.45)')
+        hGrad.addColorStop(1, 'transparent')
+        ctx.fillStyle = hGrad
+        ctx.beginPath()
+        ctx.arc(0, 0, aoe.r, 0, Math.PI * 2)
+        ctx.fill()
+
+        ctx.strokeStyle = '#4cc9f0'
+        ctx.lineWidth = 1.6
+        ctx.shadowColor = '#4cc9f0'
+        ctx.shadowBlur = 8
+        for (let k = 0; k < 4; k++) {
+          const kAng = (k / 4) * Math.PI * 2 + (aoe.spin || 0)
+          ctx.beginPath()
+          ctx.moveTo(-Math.cos(kAng) * aoe.r * 0.6, -Math.sin(kAng) * aoe.r * 0.6)
+          ctx.lineTo(Math.cos(kAng) * aoe.r * 0.6, Math.sin(kAng) * aoe.r * 0.6)
+          ctx.stroke()
+        }
+        ctx.restore()
+        ctx.restore()
+        continue
+      }
+
       // 绘制持续幽冥毒沼 (Lingering Ghost Fire Poison Pool with Dedicated Sprite)
       ctx.translate(aoe.x, aoe.y)
       const maxLife = aoe.maxActive || 3.2
@@ -8940,6 +9367,82 @@ function drawBossAoEs(ctx) {
         ctx.beginPath()
         ctx.arc(0, 0, Math.max(4, aoe.r * (1 - progress * 0.75)), 0, Math.PI * 2)
         ctx.stroke()
+      } else if (aoe.bossId === 'celestial_peng' && typeof effectPengThunderArrayLoaded !== 'undefined' && effectPengThunderArrayLoaded && effectPengThunderArrayImg) {
+        // 巡天金翅大鹏：九霄神雷八卦雷霆法阵 (太乙道纹旋转聚能)
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.rotate(progress * Math.PI * 0.6)
+        ctx.globalAlpha = 0.35 + progress * 0.65
+        const dSize = (aoe.r || 52) * 2.3
+        ctx.drawImage(effectPengThunderArrayImg, -dSize / 2, -dSize / 2, dSize, dSize)
+        ctx.restore()
+
+        // 危险边界太乙金蓝法环
+        ctx.strokeStyle = '#ffd166'
+        ctx.lineWidth = 2
+        ctx.setLineDash([8, 6])
+        ctx.beginPath()
+        ctx.arc(0, 0, aoe.r, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.setLineDash([])
+
+        // 向内聚拢的纯阳引雷电弧圈
+        ctx.strokeStyle = '#4cc9f0'
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.arc(0, 0, Math.max(4, aoe.r * (1 - progress * 0.75)), 0, Math.PI * 2)
+        ctx.stroke()
+      } else if (aoe.bossId === 'primordial_god' && typeof effectPrimordialThunderArrayLoaded !== 'undefined' && effectPrimordialThunderArrayLoaded && effectPrimordialThunderArrayImg) {
+        // 混沌太虚道祖：太虚乾坤八卦雷盘 (高精天道阵盘旋转聚能)
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.rotate(progress * Math.PI * 0.8)
+        ctx.globalAlpha = 0.4 + progress * 0.6
+        const dSize = (aoe.r || 80) * 2.35
+        ctx.drawImage(effectPrimordialThunderArrayImg, -dSize / 2, -dSize / 2, dSize, dSize)
+        ctx.restore()
+
+        // 危险边界虚空星辰雷环 (金蓝交织虚线环)
+        ctx.strokeStyle = '#ffd166'
+        ctx.lineWidth = 2.2
+        ctx.setLineDash([10, 6])
+        ctx.beginPath()
+        ctx.arc(0, 0, aoe.r, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.setLineDash([])
+
+        // 向内聚拢的太极引雷电弧圈 (彻底去除大实心圆饼遮挡，保留高辨识度空心聚雷线)
+        ctx.strokeStyle = '#4cc9f0'
+        ctx.lineWidth = 1.8
+        ctx.beginPath()
+        ctx.arc(0, 0, Math.max(6, aoe.r * (1 - progress * 0.75)), 0, Math.PI * 2)
+        ctx.stroke()
+      } else if (aoe.bossId === 'primordial_god') {
+        // 混沌太虚道祖：优雅降级空心道纹雷环 (严禁大面积半透明实心遮挡)
+        ctx.save()
+        ctx.rotate(progress * Math.PI * 0.8)
+        ctx.strokeStyle = '#ffd166'
+        ctx.lineWidth = 2.2
+        ctx.setLineDash([10, 6])
+        ctx.beginPath()
+        ctx.arc(0, 0, aoe.r, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.setLineDash([])
+
+        // 核心阴阳双鱼雷环
+        ctx.strokeStyle = '#4cc9f0'
+        ctx.lineWidth = 1.8
+        ctx.beginPath()
+        ctx.arc(0, 0, aoe.r * 0.55, 0, Math.PI * 2)
+        ctx.stroke()
+
+        // 向内聚拢引雷电弧线
+        ctx.strokeStyle = '#f72585'
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.arc(0, 0, Math.max(6, aoe.r * (1 - progress * 0.75)), 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.restore()
       } else {
         // 常规领主阵法底盘旋转
         ctx.rotate(progress * Math.PI)
@@ -8970,7 +9473,7 @@ function drawBossAoEs(ctx) {
         }
       }
     } else if (aoe.activeTimer > 0) {
-      // 爆发阶段：地裂通天光柱 / 地脉火煞冲天
+      // 爆发阶段：地裂通天光柱 / 地脉火煞冲天 / 九霄神雷轰顶
       const p = Math.max(0, Math.min(1, aoe.activeTimer / (aoe.maxActive || 0.55)))
       ctx.translate(aoe.x, aoe.y)
 
@@ -8995,6 +9498,111 @@ function drawBossAoEs(ctx) {
         ctx.beginPath()
         ctx.arc(0, 0, maxR, 0, Math.PI * 2)
         ctx.fill()
+      } else if (aoe.bossId === 'celestial_peng' && typeof effectPengThunderStrikeLoaded !== 'undefined' && effectPengThunderStrikeLoaded && effectPengThunderStrikeImg) {
+        // 巡天金翅大鹏：九霄天劫霹雳爆裂贴图 (震荡爆发与白炽雷核)
+        const burstScale = 1.0 + (1 - p) * 0.55
+        const dSize = (aoe.r || 52) * 2.5 * burstScale
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.globalAlpha = Math.min(1, p * 1.8)
+        ctx.drawImage(effectPengThunderStrikeImg, -dSize / 2, -dSize / 2, dSize, dSize)
+        ctx.restore()
+
+        // 通天九霄金雷神柱 (从九霄虚空倾泻而下轰击地面)
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        const colW = (aoe.r || 52) * 0.65 * p
+        const gradCol = ctx.createLinearGradient(0, -600, 0, 0)
+        gradCol.addColorStop(0, 'rgba(255, 255, 255, 0)')
+        gradCol.addColorStop(0.3, 'rgba(255, 209, 102, ' + (0.45 * p) + ')')
+        gradCol.addColorStop(0.7, 'rgba(76, 201, 240, ' + (0.75 * p) + ')')
+        gradCol.addColorStop(1, 'rgba(255, 255, 255, ' + (0.95 * p) + ')')
+        ctx.fillStyle = gradCol
+        ctx.fillRect(-colW / 2, -600, colW, 600)
+        ctx.restore()
+
+        // 中心天劫雷暴炽白电浆光晕
+        const maxR = Math.max(12, (aoe.r || 52) * 1.35)
+        const grad = ctx.createRadialGradient(0, 0, 8, 0, 0, maxR)
+        grad.addColorStop(0, 'rgba(255, 255, 255, ' + (0.95 * p) + ')')
+        grad.addColorStop(0.35, 'rgba(255, 209, 102, ' + (0.85 * p) + ')')
+        grad.addColorStop(0.7, 'rgba(67, 97, 238, ' + (0.5 * p) + ')')
+        grad.addColorStop(1, 'transparent')
+        ctx.fillStyle = grad
+        ctx.beginPath()
+        ctx.arc(0, 0, maxR, 0, Math.PI * 2)
+        ctx.fill()
+      } else if (aoe.bossId === 'primordial_god' && typeof effectPrimordialThunderStrikeLoaded !== 'undefined' && effectPrimordialThunderStrikeLoaded && effectPrimordialThunderStrikeImg) {
+        // 混沌太虚道祖：九天玄刹混沌天劫爆裂贴图 (震荡爆发与白炽雷核)
+        const burstScale = 1.0 + (1 - p) * 0.6
+        const dSize = (aoe.r || 80) * 2.5 * burstScale
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.globalAlpha = Math.min(1, p * 1.8)
+        ctx.drawImage(effectPrimordialThunderStrikeImg, -dSize / 2, -dSize / 2, dSize, dSize)
+        ctx.restore()
+
+        // 通天九天太虚混沌玄雷神柱 (从九天太虚倾泻而下)
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        const colW = (aoe.r || 80) * 0.85 * p
+        const gradCol = ctx.createLinearGradient(0, -700, 0, 0)
+        gradCol.addColorStop(0, 'rgba(255, 255, 255, 0)')
+        gradCol.addColorStop(0.2, 'rgba(114, 9, 183, ' + (0.45 * p) + ')')
+        gradCol.addColorStop(0.65, 'rgba(76, 201, 240, ' + (0.85 * p) + ')')
+        gradCol.addColorStop(1, 'rgba(255, 255, 255, ' + (0.98 * p) + ')')
+        ctx.fillStyle = gradCol
+        ctx.fillRect(-colW / 2, -700, colW, 700)
+
+        // 中心太虚天劫炽白电浆光晕
+        const maxR = Math.max(16, (aoe.r || 80) * 1.4)
+        const grad = ctx.createRadialGradient(0, 0, 8, 0, 0, maxR)
+        grad.addColorStop(0, 'rgba(255, 255, 255, ' + (0.98 * p) + ')')
+        grad.addColorStop(0.3, 'rgba(76, 201, 240, ' + (0.85 * p) + ')')
+        grad.addColorStop(0.7, 'rgba(114, 9, 183, ' + (0.5 * p) + ')')
+        grad.addColorStop(1, 'transparent')
+        ctx.fillStyle = grad
+        ctx.beginPath()
+        ctx.arc(0, 0, maxR, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      } else if (aoe.bossId === 'primordial_god') {
+        // 混沌太虚道祖：降级九天玄刹混沌神雷天劫雷柱
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        const colW = (aoe.r || 80) * 0.8 * p
+        const gradCol = ctx.createLinearGradient(0, -700, 0, 0)
+        gradCol.addColorStop(0, 'rgba(255, 255, 255, 0)')
+        gradCol.addColorStop(0.25, 'rgba(114, 9, 183, ' + (0.4 * p) + ')')
+        gradCol.addColorStop(0.65, 'rgba(76, 201, 240, ' + (0.8 * p) + ')')
+        gradCol.addColorStop(1, 'rgba(255, 255, 255, ' + (0.98 * p) + ')')
+        ctx.fillStyle = gradCol
+        ctx.fillRect(-colW / 2, -700, colW, 700)
+
+        // 地面玄刹太极雷爆
+        const maxR = Math.max(16, (aoe.r || 80) * 1.35)
+        const grad = ctx.createRadialGradient(0, 0, 8, 0, 0, maxR)
+        grad.addColorStop(0, 'rgba(255, 255, 255, ' + (0.95 * p) + ')')
+        grad.addColorStop(0.3, 'rgba(76, 201, 240, ' + (0.85 * p) + ')')
+        grad.addColorStop(0.7, 'rgba(114, 9, 183, ' + (0.5 * p) + ')')
+        grad.addColorStop(1, 'transparent')
+        ctx.fillStyle = grad
+        ctx.beginPath()
+        ctx.arc(0, 0, maxR, 0, Math.PI * 2)
+        ctx.fill()
+
+        // 放射状天劫电弧
+        for (let k = 0; k < 6; k++) {
+          const kAng = (k / 6) * Math.PI * 2 + (1 - p) * Math.PI
+          const kLen = maxR * (0.8 + 0.3 * Math.sin(k * 2))
+          ctx.strokeStyle = k % 2 === 0 ? '#f72585' : '#4cc9f0'
+          ctx.lineWidth = 2.2
+          ctx.beginPath()
+          ctx.moveTo(0, 0)
+          ctx.lineTo(Math.cos(kAng) * kLen, Math.sin(kAng) * kLen)
+          ctx.stroke()
+        }
+        ctx.restore()
       } else {
         ctx.globalAlpha = p
 
@@ -9031,19 +9639,58 @@ function drawBoss(ctx) {
     const rushAngle = Math.atan2(boss.rushDir.y, boss.rushDir.x)
     ctx.rotate(rushAngle)
 
-    // 预警光槽
-    ctx.fillStyle = 'rgba(230, 57, 70, 0.18)'
-    ctx.fillRect(0, -boss.r * 0.8, boss.rushDist, boss.r * 1.6)
+    if (boss.id === 'primordial_god') {
+      // 混沌太虚道祖：太虚折跃 · 空间撕裂虚空通道
+      ctx.save()
+      const corridorW = boss.r * 1.8
+      // 空间裂痕底色：幽邃紫与青冥虚空渐变
+      const riftGrad = ctx.createLinearGradient(0, -corridorW / 2, 0, corridorW / 2)
+      riftGrad.addColorStop(0, 'rgba(114, 9, 183, 0)')
+      riftGrad.addColorStop(0.2, 'rgba(114, 9, 183, 0.22)')
+      riftGrad.addColorStop(0.5, 'rgba(76, 201, 240, 0.28)')
+      riftGrad.addColorStop(0.8, 'rgba(114, 9, 183, 0.22)')
+      riftGrad.addColorStop(1, 'rgba(114, 9, 183, 0)')
+      ctx.fillStyle = riftGrad
+      ctx.fillRect(0, -corridorW / 2, boss.rushDist, corridorW)
 
-    // 充能推进条
-    ctx.fillStyle = 'rgba(255, 190, 11, 0.45)'
-    ctx.fillRect(0, -boss.r * 0.8, boss.rushDist * p, boss.r * 1.6)
+      // 太虚折跃充能波 (虚空引力前推波)
+      const pulseGrad = ctx.createLinearGradient(0, 0, boss.rushDist * p, 0)
+      pulseGrad.addColorStop(0, 'rgba(114, 9, 183, 0.15)')
+      pulseGrad.addColorStop(0.7, 'rgba(76, 201, 240, 0.5)')
+      pulseGrad.addColorStop(1, 'rgba(255, 255, 255, 0.85)')
+      ctx.fillStyle = pulseGrad
+      ctx.fillRect(0, -corridorW * 0.4, boss.rushDist * p, corridorW * 0.8)
 
-    // 边缘危险线
-    ctx.strokeStyle = '#e63946'
-    ctx.lineWidth = 2
-    ctx.setLineDash([8, 6])
-    ctx.strokeRect(0, -boss.r * 0.8, boss.rushDist, boss.r * 1.6)
+      // 中心空间撕裂裂痕
+      ctx.strokeStyle = '#ffd166'
+      ctx.lineWidth = 2.5
+      ctx.beginPath()
+      ctx.moveTo(0, 0)
+      ctx.lineTo(boss.rushDist * p, 0)
+      ctx.stroke()
+
+      // 太虚空间扭曲虚线边界
+      ctx.strokeStyle = '#4cc9f0'
+      ctx.lineWidth = 2
+      ctx.setLineDash([12, 8])
+      ctx.strokeRect(0, -corridorW / 2, boss.rushDist, corridorW)
+      ctx.setLineDash([])
+      ctx.restore()
+    } else {
+      // 常规领主冲刺光槽
+      ctx.fillStyle = 'rgba(230, 57, 70, 0.18)'
+      ctx.fillRect(0, -boss.r * 0.8, boss.rushDist, boss.r * 1.6)
+
+      // 充能推进条
+      ctx.fillStyle = 'rgba(255, 190, 11, 0.45)'
+      ctx.fillRect(0, -boss.r * 0.8, boss.rushDist * p, boss.r * 1.6)
+
+      // 边缘危险线
+      ctx.strokeStyle = '#e63946'
+      ctx.lineWidth = 2
+      ctx.setLineDash([8, 6])
+      ctx.strokeRect(0, -boss.r * 0.8, boss.rushDist, boss.r * 1.6)
+    }
     ctx.restore()
   }
 
@@ -9820,6 +10467,91 @@ function drawAsuraDemonModel(ctx, boss) {
 function drawCelestialPengModel(ctx, boss) {
   ctx.save()
   const t = boss.animTimer
+  const isRushing = boss.state === 'rushing' || boss.state === 'telegraph_rush'
+  const isBarrage = boss.state === 'casting_barrage'
+  const isAoE = boss.state === 'casting_aoe'
+
+  // 初始化专属 24 帧动作播放器
+  if (!boss.pengAnims && typeof SpriteSheetAnimation !== 'undefined') {
+    boss.pengAnims = {
+      rush: (typeof bossPengRushSheetLoaded !== 'undefined' && bossPengRushSheetLoaded && bossPengRushSheetImg) ? new SpriteSheetAnimation({
+        img: bossPengRushSheetImg,
+        frameW: 256,
+        frameH: 256,
+        cols: 6,
+        rows: 4,
+        totalFrames: 24,
+        fps: 18,
+        loop: true
+      }) : null,
+      feather: (typeof bossPengFeatherSheetLoaded !== 'undefined' && bossPengFeatherSheetLoaded && bossPengFeatherSheetImg) ? new SpriteSheetAnimation({
+        img: bossPengFeatherSheetImg,
+        frameW: 256,
+        frameH: 256,
+        cols: 6,
+        rows: 4,
+        totalFrames: 24,
+        fps: 16,
+        loop: true
+      }) : null,
+      screech: (typeof bossPengScreechSheetLoaded !== 'undefined' && bossPengScreechSheetLoaded && bossPengScreechSheetImg) ? new SpriteSheetAnimation({
+        img: bossPengScreechSheetImg,
+        frameW: 256,
+        frameH: 256,
+        cols: 6,
+        rows: 4,
+        totalFrames: 24,
+        fps: 12,
+        loop: true
+      }) : null
+    }
+  }
+
+  // 动态选择当前动作播放器
+  let anim = null
+  if (boss.pengAnims) {
+    if (isRushing) {
+      anim = boss.pengAnims.rush || boss.pengAnims.screech
+    } else if (isBarrage) {
+      anim = boss.pengAnims.feather || boss.pengAnims.screech
+    } else {
+      anim = boss.pengAnims.screech || boss.pengAnims.feather
+    }
+  }
+  if (!anim && boss.sheetAnim) anim = boss.sheetAnim
+
+  if (anim && anim.img && (typeof anim.img.complete === 'undefined' || anim.img.complete)) {
+    const spriteSize = boss.r * 3.4 // ~165px
+    const floatY = Math.sin(t * 3.5) * 3
+    const scale = spriteSize / 256
+
+    ctx.save()
+    ctx.translate(0, floatY)
+
+    // 冲刺状态朝向判断与翻转 (序列帧原生左向俯冲，向右突进时水平镜像)
+    if (isRushing && boss.rushDir) {
+      if (boss.rushDir.x > 0) {
+        ctx.scale(-1, 1)
+      }
+    }
+
+    anim.draw(ctx, 0, 0, scale, 0)
+
+    // 受击白金神芒反馈
+    if (boss.hit > 0) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+      const hitAlpha = Math.min(0.55, (boss.hit / 0.16) * 0.45)
+      anim.draw(ctx, 0, 0, scale, 0, hitAlpha)
+      ctx.restore()
+    }
+
+    ctx.restore()
+    ctx.restore()
+    return
+  }
+
+  // Fallback 矢量模型 (当未载入或单测无图像时)
   const wingBeat = Math.sin(t * 8) * 0.35
 
   // 纯阳太乙金翼
@@ -9927,8 +10659,144 @@ function drawPrimordialGodModel(ctx, boss) {
   const t = boss.animTimer
   const isEnraged = boss.phaseIndex >= 1
   const isFinalPhase = boss.phaseIndex >= 2
+  const isRushing = boss.state === 'rushing' || boss.state === 'telegraph_rush'
+  const isBarrage = boss.state === 'casting_barrage'
+  const isAoE = boss.state === 'casting_aoe'
+  const isSingularity = boss.state === 'singularity' || boss.state === 'casting_singularity'
 
-  // 1. 周身旋转九天玄黄太极八卦星环
+  // 初始化专属 4 套 24 帧动作播放器
+  if (!boss.primordialAnims && typeof SpriteSheetAnimation !== 'undefined') {
+    boss.primordialAnims = {
+      whisk: (typeof bossPrimordialWhiskSheetLoaded !== 'undefined' && bossPrimordialWhiskSheetLoaded && bossPrimordialWhiskSheetImg) ? new SpriteSheetAnimation({
+        img: bossPrimordialWhiskSheetImg,
+        frameW: 256,
+        frameH: 256,
+        cols: 6,
+        rows: 4,
+        totalFrames: 24,
+        fps: 16,
+        loop: true
+      }) : null,
+      scroll: (typeof bossPrimordialScrollSheetLoaded !== 'undefined' && bossPrimordialScrollSheetLoaded && bossPrimordialScrollSheetImg) ? new SpriteSheetAnimation({
+        img: bossPrimordialScrollSheetImg,
+        frameW: 256,
+        frameH: 256,
+        cols: 6,
+        rows: 4,
+        totalFrames: 24,
+        fps: 15,
+        loop: true
+      }) : null,
+      singularity: (typeof bossPrimordialSingularitySheetLoaded !== 'undefined' && bossPrimordialSingularitySheetLoaded && bossPrimordialSingularitySheetImg) ? new SpriteSheetAnimation({
+        img: bossPrimordialSingularitySheetImg,
+        frameW: 256,
+        frameH: 256,
+        cols: 6,
+        rows: 4,
+        totalFrames: 24,
+        fps: 16,
+        loop: true
+      }) : null,
+      rush: (typeof bossPrimordialRushSheetLoaded !== 'undefined' && bossPrimordialRushSheetLoaded && bossPrimordialRushSheetImg) ? new SpriteSheetAnimation({
+        img: bossPrimordialRushSheetImg,
+        frameW: 256,
+        frameH: 256,
+        cols: 6,
+        rows: 4,
+        totalFrames: 24,
+        fps: 20,
+        loop: true
+      }) : null
+    }
+  }
+
+  // 动态选择当前动作播放器
+  let anim = null
+  if (boss.primordialAnims) {
+    if (isRushing) {
+      anim = boss.primordialAnims.rush || boss.primordialAnims.whisk
+    } else if (isSingularity) {
+      anim = boss.primordialAnims.singularity || boss.primordialAnims.whisk
+    } else if (isAoE) {
+      anim = boss.primordialAnims.scroll || boss.primordialAnims.whisk
+    } else if (isBarrage) {
+      anim = boss.primordialAnims.whisk || boss.primordialAnims.scroll
+    } else {
+      anim = boss.primordialAnims.whisk || boss.primordialAnims.scroll
+    }
+  }
+  if (!anim && boss.sheetAnim) anim = boss.sheetAnim
+
+  // 1. 周身外侧悬浮的太虚诛仙飞剑御阵 (伴随天道流光飞旋)
+  const swordCount = isFinalPhase ? 6 : 4
+  for (let s = 0; s < swordCount; s++) {
+    const sAngle = (s / swordCount) * Math.PI * 2 + t * 1.6
+    const sx = Math.cos(sAngle) * (boss.r + 34)
+    const sy = Math.sin(sAngle) * (boss.r + 34)
+    ctx.save()
+    ctx.translate(sx, sy)
+    ctx.rotate(sAngle + Math.PI / 2)
+    if (typeof effectPrimordialBladeLoaded !== 'undefined' && effectPrimordialBladeLoaded && effectPrimordialBladeImg) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+      const swW = 38
+      const swH = 19
+      ctx.drawImage(effectPrimordialBladeImg, -swW * 0.5, -swH * 0.5, swW, swH)
+      ctx.restore()
+    } else {
+      ctx.fillStyle = '#ffd700'
+      ctx.shadowColor = '#4cc9f0'
+      ctx.shadowBlur = 10
+      ctx.beginPath()
+      ctx.moveTo(0, -16)
+      ctx.lineTo(4, 8)
+      ctx.lineTo(2, 14)
+      ctx.lineTo(-2, 14)
+      ctx.lineTo(-4, 8)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillStyle = '#4cc9f0'
+      ctx.fillRect(-1, -12, 2, 18)
+    }
+    ctx.restore()
+  }
+
+  // 2. 绘制 24 帧精灵表动画
+  if (anim && anim.img && (typeof anim.img.complete === 'undefined' || anim.img.complete)) {
+    const spriteSize = boss.r * 4.3 // ~232px
+    const floatY = Math.sin(t * 2.8) * 3.5
+    const scale = spriteSize / 256
+
+    ctx.save()
+    ctx.translate(0, floatY)
+
+    // 突刺朝向翻转 (rush 序列帧面向右侧，向左突刺时水平翻转)
+    if (isRushing && boss.rushDir) {
+      if (boss.rushDir.x < 0) {
+        ctx.scale(-1, 1)
+      }
+    } else if (game.player && game.player.x < boss.x) {
+      ctx.scale(-1, 1)
+    }
+
+    anim.draw(ctx, 0, 0, scale, 0)
+
+    // 受击天道白金神芒反馈
+    if (boss.hit > 0) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+      const hitAlpha = Math.min(0.55, (boss.hit / 0.16) * 0.45)
+      anim.draw(ctx, 0, 0, scale, 0, hitAlpha)
+      ctx.restore()
+    }
+
+    ctx.restore()
+    ctx.restore()
+    return
+  }
+
+  // 3. 优雅降级：若贴图尚未载入，绘制原有矢量太极八卦尊容法相
+  // 3.1 周身旋转九天玄黄太极八卦星环
   const ringRadius = boss.r * 1.55
   ctx.save()
   ctx.rotate(t * 0.7)
@@ -9940,7 +10808,7 @@ function drawPrimordialGodModel(ctx, boss) {
   ctx.stroke()
   ctx.restore()
 
-  // 2. 八方阵位流转道纹 (8个旋转星宿灵光)
+  // 3.2 八方阵位流转道纹
   const trigramCount = 8
   for (let i = 0; i < trigramCount; i++) {
     const angle = (i / trigramCount) * Math.PI * 2 + t * 0.7
@@ -9956,7 +10824,7 @@ function drawPrimordialGodModel(ctx, boss) {
     ctx.restore()
   }
 
-  // 3. 护体悬浮太极图 (核心阴阳双鱼反向飞转)
+  // 3.3 护体悬浮太极图
   ctx.save()
   ctx.rotate(-t * 1.2)
   // 阳鱼 (天青)
@@ -9986,33 +10854,10 @@ function drawPrimordialGodModel(ctx, boss) {
   ctx.fill()
   ctx.restore()
 
-  // 4. 周身外侧悬浮的太虚诛仙飞剑御阵 (4/6把流光飞剑绕体)
-  const swordCount = isFinalPhase ? 6 : 4
-  for (let s = 0; s < swordCount; s++) {
-    const sAngle = (s / swordCount) * Math.PI * 2 + t * 1.6
-    const sx = Math.cos(sAngle) * (boss.r + 26)
-    const sy = Math.sin(sAngle) * (boss.r + 26)
-    ctx.save()
-    ctx.translate(sx, sy)
-    ctx.rotate(sAngle + Math.PI / 2)
-    ctx.fillStyle = '#ffd700'
-    ctx.shadowColor = '#4cc9f0'
-    ctx.shadowBlur = 10
-    ctx.beginPath()
-    ctx.moveTo(0, -14)
-    ctx.lineTo(3.5, 8)
-    ctx.lineTo(0, 12)
-    ctx.lineTo(-3.5, 8)
-    ctx.closePath()
-    ctx.fill()
-    ctx.restore()
-  }
-
-  // 5. 神道法相尊容 (额间开天神目与金冠霞帔)
+  // 3.4 神冠与开天神目
   ctx.fillStyle = '#ffd700'
   ctx.shadowColor = '#ffd700'
   ctx.shadowBlur = 12
-  // 神冠
   ctx.beginPath()
   ctx.moveTo(-16, -boss.r * 0.72)
   ctx.lineTo(-8, -boss.r * 0.72 - 16)
@@ -10022,7 +10867,6 @@ function drawPrimordialGodModel(ctx, boss) {
   ctx.closePath()
   ctx.fill()
 
-  // 开天神目
   ctx.fillStyle = '#ffffff'
   ctx.beginPath()
   ctx.arc(0, -4, 4.5, 0, Math.PI * 2)
@@ -10141,26 +10985,54 @@ function drawBossProjectiles(ctx) {
     } else if (proj.type === 'feather') {
       const ang = Math.atan2(proj.vy, proj.vx)
       ctx.rotate(ang)
-      ctx.fillStyle = '#ffffff'
-      ctx.beginPath()
-      ctx.moveTo(proj.r * 2, 0)
-      ctx.lineTo(-proj.r, -4)
-      ctx.lineTo(-proj.r, 4)
-      ctx.closePath()
-      ctx.fill()
+      if (typeof effectPengFeatherLoaded !== 'undefined' && effectPengFeatherLoaded && effectPengFeatherImg) {
+        // 太乙金羽剑雨：采用 source-over 实体混合与微柔暖琥珀暗影，彻底去除过度高光过曝，使太古泥金飞羽神剑本体纤毫毕现
+        ctx.save()
+        ctx.globalCompositeOperation = 'source-over'
+        ctx.shadowColor = 'rgba(60, 30, 0, 0.55)'
+        ctx.shadowBlur = 4
+        ctx.shadowOffsetX = 0
+        ctx.shadowOffsetY = 1
+        const fWidth = Math.max(44, proj.r * 7.0)
+        const fHeight = fWidth * 0.4
+        ctx.drawImage(effectPengFeatherImg, -fWidth * 0.55, -fHeight * 0.5, fWidth, fHeight)
+        ctx.restore()
+      } else {
+        ctx.fillStyle = '#d97706'
+        ctx.beginPath()
+        ctx.moveTo(proj.r * 2.2, 0)
+        ctx.lineTo(-proj.r, -3.5)
+        ctx.lineTo(-proj.r * 0.5, 0)
+        ctx.lineTo(-proj.r, 3.5)
+        ctx.closePath()
+        ctx.fill()
+        ctx.fillStyle = '#ffbe0b'
+        ctx.fillRect(-proj.r * 0.5, -1, proj.r * 1.8, 2)
+      }
     } else if (proj.type === 'cosmic_blade') {
       const ang = Math.atan2(proj.vy, proj.vx)
       ctx.rotate(ang)
-      ctx.fillStyle = proj.glowColor
-      ctx.fillRect(-proj.r * 2, -2, proj.r * 4, 4)
-      ctx.fillStyle = proj.color
-      ctx.beginPath()
-      ctx.moveTo(proj.r * 2.5, 0)
-      ctx.lineTo(-proj.r * 1.5, -4)
-      ctx.lineTo(-proj.r, 0)
-      ctx.lineTo(-proj.r * 1.5, 4)
-      ctx.closePath()
-      ctx.fill()
+      if (typeof effectPrimordialBladeLoaded !== 'undefined' && effectPrimordialBladeLoaded && effectPrimordialBladeImg) {
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        const bWidth = Math.max(46, proj.r * 6.5)
+        const bHeight = bWidth * 0.5
+        ctx.drawImage(effectPrimordialBladeImg, -bWidth * 0.6, -bHeight * 0.5, bWidth, bHeight)
+        ctx.restore()
+      } else {
+        ctx.fillStyle = proj.glowColor
+        ctx.shadowColor = '#4cc9f0'
+        ctx.shadowBlur = 10
+        ctx.beginPath()
+        ctx.moveTo(proj.r * 2.8, 0)
+        ctx.lineTo(-proj.r * 1.4, -proj.r * 0.5)
+        ctx.lineTo(-proj.r * 2.0, 0)
+        ctx.lineTo(-proj.r * 1.4, proj.r * 0.5)
+        ctx.closePath()
+        ctx.fill()
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(-proj.r * 1.0, -1, proj.r * 2.4, 2)
+      }
     } else if (proj.type === 'asura_soul') {
       const ang = Math.atan2(proj.vy, proj.vx)
       // effect_asura_soul.png 鬼面朝向右下角约 45 度 (Math.PI / 4)
@@ -10183,14 +11055,24 @@ function drawBossProjectiles(ctx) {
       }
     } else if (proj.type === 'yin_yang_orb') {
       ctx.rotate(game.elapsed * 6)
-      ctx.fillStyle = proj.color
-      ctx.beginPath()
-      ctx.arc(0, 0, proj.r, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.fillStyle = proj.glowColor
-      ctx.beginPath()
-      ctx.arc(proj.r * 0.35, 0, proj.r * 0.4, 0, Math.PI * 2)
-      ctx.fill()
+      if (typeof effectPrimordialOrbLoaded !== 'undefined' && effectPrimordialOrbLoaded && effectPrimordialOrbImg) {
+        ctx.save()
+        ctx.globalCompositeOperation = 'source-over'
+        ctx.shadowColor = 'rgba(114, 9, 183, 0.65)'
+        ctx.shadowBlur = 8
+        const oSize = Math.max(30, proj.r * 3.4)
+        ctx.drawImage(effectPrimordialOrbImg, -oSize / 2, -oSize / 2, oSize, oSize)
+        ctx.restore()
+      } else {
+        ctx.fillStyle = proj.color
+        ctx.beginPath()
+        ctx.arc(0, 0, proj.r, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = proj.glowColor
+        ctx.beginPath()
+        ctx.arc(proj.r * 0.35, 0, proj.r * 0.4, 0, Math.PI * 2)
+        ctx.fill()
+      }
     } else {
       // 幽冥魔魂弹
       ctx.fillStyle = proj.color
@@ -19738,6 +20620,7 @@ if (typeof window !== 'undefined') {
     damageBoss,
     BOSS_CONFIGS,
     SpriteSheetAnimation,
+    drawCelestialPengModel,
     getSpriteSquash,
     spawnPlayerGhostTrail,
     spawnBossGhostTrail,
@@ -19875,6 +20758,63 @@ if (typeof window !== 'undefined') {
       setSoulLoaded: (v) => { effectAsuraSoulLoaded = v },
       setBlackholeLoaded: (v) => { effectAsuraBlackholeLoaded = v }
     }),
+    getCelestialPengTextures: () => ({
+      get rushSheetImg() { return bossPengRushSheetImg },
+      get rushSheetLoaded() { return bossPengRushSheetLoaded },
+      get featherSheetImg() { return bossPengFeatherSheetImg },
+      get featherSheetLoaded() { return bossPengFeatherSheetLoaded },
+      get screechSheetImg() { return bossPengScreechSheetImg },
+      get screechSheetLoaded() { return bossPengScreechSheetLoaded },
+      get featherImg() { return effectPengFeatherImg },
+      get featherLoaded() { return effectPengFeatherLoaded },
+      get thunderArrayImg() { return effectPengThunderArrayImg },
+      get thunderArrayLoaded() { return effectPengThunderArrayLoaded },
+      get thunderStrikeImg() { return effectPengThunderStrikeImg },
+      get thunderStrikeLoaded() { return effectPengThunderStrikeLoaded },
+      setRushSheetLoaded: (v) => { bossPengRushSheetLoaded = v },
+      setFeatherSheetLoaded: (v) => { bossPengFeatherSheetLoaded = v },
+      setScreechSheetLoaded: (v) => { bossPengScreechSheetLoaded = v },
+      setFeatherLoaded: (v) => { effectPengFeatherLoaded = v },
+      setThunderArrayLoaded: (v) => { effectPengThunderArrayLoaded = v },
+      setThunderStrikeLoaded: (v) => { effectPengThunderStrikeLoaded = v },
+      setFeatherImg: (img) => { effectPengFeatherImg = img },
+      setThunderArrayImg: (img) => { effectPengThunderArrayImg = img },
+      setThunderStrikeImg: (img) => { effectPengThunderStrikeImg = img }
+    }),
+    getPrimordialGodTextures: () => ({
+      get whiskSheetImg() { return bossPrimordialWhiskSheetImg },
+      get whiskSheetLoaded() { return bossPrimordialWhiskSheetLoaded },
+      get scrollSheetImg() { return bossPrimordialScrollSheetImg },
+      get scrollSheetLoaded() { return bossPrimordialScrollSheetLoaded },
+      get singularitySheetImg() { return bossPrimordialSingularitySheetImg },
+      get singularitySheetLoaded() { return bossPrimordialSingularitySheetLoaded },
+      get rushSheetImg() { return bossPrimordialRushSheetImg },
+      get rushSheetLoaded() { return bossPrimordialRushSheetLoaded },
+      get thunderArrayImg() { return effectPrimordialThunderArrayImg },
+      get thunderArrayLoaded() { return effectPrimordialThunderArrayLoaded },
+      get thunderStrikeImg() { return effectPrimordialThunderStrikeImg },
+      get thunderStrikeLoaded() { return effectPrimordialThunderStrikeLoaded },
+      get bladeImg() { return effectPrimordialBladeImg },
+      get bladeLoaded() { return effectPrimordialBladeLoaded },
+      get orbImg() { return effectPrimordialOrbImg },
+      get orbLoaded() { return effectPrimordialOrbLoaded },
+      setWhiskSheetLoaded: (v) => { bossPrimordialWhiskSheetLoaded = v },
+      setScrollSheetLoaded: (v) => { bossPrimordialScrollSheetLoaded = v },
+      setSingularitySheetLoaded: (v) => { bossPrimordialSingularitySheetLoaded = v },
+      setRushSheetLoaded: (v) => { bossPrimordialRushSheetLoaded = v },
+      setThunderArrayLoaded: (v) => { effectPrimordialThunderArrayLoaded = v },
+      setThunderStrikeLoaded: (v) => { effectPrimordialThunderStrikeLoaded = v },
+      setBladeLoaded: (v) => { effectPrimordialBladeLoaded = v },
+      setOrbLoaded: (v) => { effectPrimordialOrbLoaded = v },
+      setThunderArrayImg: (img) => { effectPrimordialThunderArrayImg = img },
+      setThunderStrikeImg: (img) => { effectPrimordialThunderStrikeImg = img },
+      setBladeImg: (img) => { effectPrimordialBladeImg = img },
+      setOrbImg: (img) => { effectPrimordialOrbImg = img }
+    }),
+    drawPrimordialGodModel,
+    startCastSingularity,
+    executeSingularityBurst,
+    executePrimordialAoE,
     initAsuraDemon,
     updateAsuraDemon,
     updateAsuraHexLasers,

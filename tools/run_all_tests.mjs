@@ -24,6 +24,8 @@ const testFiles = [
   'test_damage_numbers.mjs',
   'test_all_enemy_damage.mjs',
   'test_hit_feedback.mjs',
+  'test_celestial_peng.mjs',
+  'test_primordial_god.mjs',
   'verify_asset_paths.mjs'
 ]
 

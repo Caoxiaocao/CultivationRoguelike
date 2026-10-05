@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>巡天金翅大鹏 · 24帧三动作序列帧检视器</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #090d13;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 20px;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 14px;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #ffb703;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+      text-shadow: 0 0 16px rgba(255, 183, 3, 0.4);
+    }
+    p.subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+    }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(255, 183, 3, 0.25);
+      padding: 8px 16px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      align-items: center;
+      backdrop-filter: blur(8px);
+      font-size: 13px;
+    }
+    .btn {
+      background: #1e293b;
+      color: #f1f5f9;
+      border: 1px solid #334155;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+    .btn:hover {
+      background: #334155;
+      border-color: #ffb703;
+      color: #ffb703;
+    }
+    .btn.active {
+      background: #ffb703;
+      color: #0f172a;
+      border-color: #ffb703;
+    }
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      width: 100%;
+      max-width: 1360px;
+    }
+    .action-card {
+      background: #0f172a;
+      border: 1px solid rgba(255, 183, 3, 0.2);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: #fbbf24;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-desc {
+      font-size: 11px;
+      color: #64748b;
+      margin-bottom: 10px;
+      text-align: center;
+      line-height: 1.4;
+    }
+    .preview-stage {
+      width: 256px;
+      height: 256px;
+      border-radius: 12px;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 16px;
+      border: 2px solid rgba(255, 183, 3, 0.35);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.6);
+    }
+    .bg-dark { background-color: #0b111a; }
+    .bg-checker {
+      background-color: #1e293b;
+      background-image: linear-gradient(45deg, #0f172a 25%, transparent 25%),
+                        linear-gradient(-45deg, #0f172a 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #0f172a 75%),
+                        linear-gradient(-45deg, transparent 75%, #0f172a 75%);
+    }
+    .bg-ink { background-color: #f4efe6; }
+    canvas.preview-canvas {
+      width: 256px;
+      height: 256px;
+      display: block;
+      image-rendering: auto;
+    }
+    .frame-indicator {
+      font-family: monospace;
+      font-size: 14px;
+      color: #38bdf8;
+      margin-bottom: 12px;
+    }
+    .filmstrip-container {
+      width: 100%;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-top: 8px;
+    }
+    .filmstrip {
+      display: flex;
+      gap: 6px;
+      width: max-content;
+    }
+    .thumb-frame {
+      width: 48px;
+      height: 48px;
+      border: 1px solid #334155;
+      border-radius: 4px;
+      background: #0b111a;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .thumb-frame.current {
+      border: 2px solid #ffb703;
+      box-shadow: 0 0 8px #ffb703;
+    }
+    .thumb-frame canvas {
+      width: 48px;
+      height: 48px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>巡天金翅大鹏 · 24帧三动作序列帧全景走查</h1>
+    <p class="subtitle">根据设定图生成的 24 帧全流程动作图集 · 冲刺飞扑 / 扇动翅膀发射羽毛 / 矗立鸣叫</p>
+  </header>
+
+  <div class="toolbar">
+    <span>播放控制:</span>
+    <button class="btn" id="btn_toggle_play">暂停</button>
+    <button class="btn" id="btn_prev">上1帧</button>
+    <button class="btn" id="btn_next">下1帧</button>
+
+    <span style="margin-left: 12px;">帧率:</span>
+    <button class="btn fps-btn" data-fps="8">8 FPS</button>
+    <button class="btn fps-btn active" data-fps="12">12 FPS</button>
+    <button class="btn fps-btn" data-fps="16">16 FPS</button>
+    <button class="btn fps-btn" data-fps="24">24 FPS</button>
+
+    <span style="margin-left: 12px;">底色风格:</span>
+    <button class="btn bg-btn active" data-bg="bg-dark">太虚暗夜</button>
+    <button class="btn bg-btn" data-bg="bg-checker">透明棋盘</button>
+    <button class="btn bg-btn" data-bg="bg-ink">国风熟宣</button>
+  </div>
+
+  <div class="actions-grid">
+    <!-- 动作 1 -->
+    <div class="action-card">
+      <div class="card-title">① 冲刺飞扑</div>
+      <div class="card-desc">0~4蓄力引弓 | 5~13破空俯冲暴冲 | 14~18利爪绝杀与制动 | 19~23凌空复位</div>
+      <div class="preview-stage bg-dark" id="stage_rush">
+        <canvas class="preview-canvas" id="cvs_preview_rush" width="256" height="256"></canvas>
+      </div>
+      <div class="frame-indicator" id="ind_rush">帧: 0 / 23 (0.00s)</div>
+      <div class="filmstrip-container">
+        <div class="filmstrip" id="strip_rush"></div>
+      </div>
+    </div>
+
+    <!-- 动作 2 -->
+    <div class="action-card">
+      <div class="card-title">② 扇翅射羽</div>
+      <div class="card-desc">0~6蓄风引气扬翼 | 7~10怒振下扑 | 11~17太乙破空金羽齐射 | 18~23回风复位</div>
+      <div class="preview-stage bg-dark" id="stage_feather">
+        <canvas class="preview-canvas" id="cvs_preview_feather" width="256" height="256"></canvas>
+      </div>
+      <div class="frame-indicator" id="ind_feather">帧: 0 / 23 (0.00s)</div>
+      <div class="filmstrip-container">
+        <div class="filmstrip" id="strip_feather"></div>
+      </div>
+    </div>
+
+    <!-- 动作 3 -->
+    <div class="action-card">
+      <div class="card-title">③ 矗立鸣叫</div>
+      <div class="card-desc">0~5敛羽深吸 | 6~16仰天长鸣·同心金水墨音浪震荡 | 17~20音律收敛 | 21~23帝尊复位</div>
+      <div class="preview-stage bg-dark" id="stage_screech">
+        <canvas class="preview-canvas" id="cvs_preview_screech" width="256" height="256"></canvas>
+      </div>
+      <div class="frame-indicator" id="ind_screech">帧: 0 / 23 (0.00s)</div>
+      <div class="filmstrip-container">
+        <div class="filmstrip" id="strip_screech"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const actions = [
+      { id: 'rush', src: '../public/boss_peng_rush_sheet.png' },
+      { id: 'feather', src: '../public/boss_peng_feather_sheet.png' },
+      { id: 'screech', src: '../public/boss_peng_screech_sheet.png' }
+    ];
+
+    let currentFPS = 12;
+    let isPlaying = true;
+    let curFrame = 0;
+    const totalFrames = 24;
+    const cols = 6;
+    const rows = 4;
+    const frameW = 256;
+    const frameH = 256;
+
+    const loadedImages = {};
+
+    actions.forEach(act => {
+      const img = new Image();
+      img.src = act.src;
+      img.onload = () => {
+        loadedImages[act.id] = img;
+        buildFilmstrip(act.id, img);
+        drawFrame(act.id, curFrame);
+      };
+    });
+
+    function drawFrame(actId, frameIdx) {
+      const img = loadedImages[actId];
+      if (!img) return;
+
+      const cvs = document.getElementById('cvs_preview_' + actId);
+      const ctx = cvs.getContext('2d');
+      ctx.clearRect(0, 0, frameW, frameH);
+
+      const col = frameIdx % cols;
+      const row = Math.floor(frameIdx / cols);
+      const sx = col * frameW;
+      const sy = row * frameH;
+
+      ctx.drawImage(img, sx, sy, frameW, frameH, 0, 0, frameW, frameH);
+
+      const ind = document.getElementById('ind_' + actId);
+      if (ind) {
+        ind.textContent = `帧: ${frameIdx} / ${totalFrames - 1} (${(frameIdx / currentFPS).toFixed(2)}s)`;
+      }
+
+      // 更新高亮缩略图
+      const strip = document.getElementById('strip_' + actId);
+      if (strip) {
+        const thumbs = strip.querySelectorAll('.thumb-frame');
+        thumbs.forEach((th, idx) => {
+          if (idx === frameIdx) th.classList.add('current');
+          else th.classList.remove('current');
+        });
+      }
+    }
+
+    function buildFilmstrip(actId, img) {
+      const strip = document.getElementById('strip_' + actId);
+      strip.innerHTML = '';
+
+      for (let f = 0; f < totalFrames; f++) {
+        const thumbDiv = document.createElement('div');
+        thumbDiv.className = 'thumb-frame' + (f === curFrame ? ' current' : '');
+        thumbDiv.title = `帧 ${f}`;
+
+        const thumbCvs = document.createElement('canvas');
+        thumbCvs.width = 48;
+        thumbCvs.height = 48;
+        const tctx = thumbCvs.getContext('2d');
+
+        const col = f % cols;
+        const row = Math.floor(f / cols);
+        tctx.drawImage(img, col * frameW, row * frameH, frameW, frameH, 0, 0, 48, 48);
+
+        thumbDiv.appendChild(thumbCvs);
+        thumbDiv.addEventListener('click', () => {
+          curFrame = f;
+          actions.forEach(a => drawFrame(a.id, curFrame));
+        });
+        strip.appendChild(thumbDiv);
+      }
+    }
+
+    let lastTick = performance.now();
+    let frameAcc = 0;
+
+    function loop(time) {
+      const dt = (time - lastTick) / 1000;
+      lastTick = time;
+
+      if (isPlaying) {
+        frameAcc += dt;
+        const frameDuration = 1 / currentFPS;
+        while (frameAcc >= frameDuration) {
+          frameAcc -= frameDuration;
+          curFrame = (curFrame + 1) % totalFrames;
+          actions.forEach(a => drawFrame(a.id, curFrame));
+        }
+      }
+
+      requestAnimationFrame(loop);
+    }
+    requestAnimationFrame(loop);
+
+    // 控制按钮绑定
+    const btnPlay = document.getElementById('btn_toggle_play');
+    btnPlay.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      btnPlay.textContent = isPlaying ? '暂停' : '播放';
+    });
+
+    document.getElementById('btn_prev').addEventListener('click', () => {
+      isPlaying = false;
+      btnPlay.textContent = '播放';
+      curFrame = (curFrame - 1 + totalFrames) % totalFrames;
+      actions.forEach(a => drawFrame(a.id, curFrame));
+    });
+
+    document.getElementById('btn_next').addEventListener('click', () => {
+      isPlaying = false;
+      btnPlay.textContent = '播放';
+      curFrame = (curFrame + 1) % totalFrames;
+      actions.forEach(a => drawFrame(a.id, curFrame));
+    });
+
+    document.querySelectorAll('.fps-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.fps-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentFPS = parseInt(btn.dataset.fps, 10);
+      });
+    });
+
+    document.querySelectorAll('.bg-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.bg-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const bgClass = btn.dataset.bg;
+        document.querySelectorAll('.preview-stage').forEach(st => {
+          st.className = 'preview-stage ' + bgClass;
+        });
+      });
+    });
+  </script>
+</body>
+</html>
