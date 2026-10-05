@@ -105,6 +105,7 @@ app.innerHTML = `<div class="app-shell">
           <button class="test-hud-btn highlight" id="test-hud-btn-panel" title="打开调整控制台 (快捷键 T)">⚙ 调整 (T)</button>
           <button class="test-hud-btn" id="test-hud-btn-dummy" title="召唤不死神木桩">🪵 召木桩</button>
           <button class="test-hud-btn" id="test-hud-btn-straw" title="召唤易爆草人群测试AOE">🌾 召草人</button>
+          <button class="test-hud-btn" id="test-hud-btn-boss" title="召唤/切换测试秘境领主">👹 召领主</button>
           <button class="test-hud-btn" id="test-hud-btn-clear" title="清空所有木桩与敌人">🧹 清屏</button>
           <button class="test-hud-btn" id="test-hud-btn-reset-stat" title="重置秒伤和累计伤害统计">🔄 重置统计</button>
           <button class="test-hud-btn exit" id="test-hud-btn-exit" title="退出演武场返回主界面">🚪 退出</button>
@@ -617,15 +618,328 @@ const sound = {
   shoot() {
     this.playTone(880, 'triangle', 0.12, 0.45, 240)
   },
-  hit() {
-    this.playTone(160, 'sawtooth', 0.16, 0.55, 60)
+  hit(type = 'bullet') {
+    this.playerHurt(type)
   },
-  defeat() {
+  playerHurt(hitType = 'bullet') {
+    this._lastPlayerHurt = { hitType, time: Date.now() }
+    if (!this.enabled || isHeadless) return
+    this.init()
+    this.resume()
+    if (!this.ctx || !this.masterGain) return
+
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    if (this._lastPlayerHurtSound && now - this._lastPlayerHurtSound < 50) {
+      if (hitType === 'dot') return
+    }
+    this._lastPlayerHurtSound = now
+
+    try {
+      const t = this.ctx.currentTime
+      if (hitType === 'frost') {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(860, t)
+        osc.frequency.exponentialRampToValueAtTime(280, t + 0.12)
+        gain.gain.setValueAtTime(0.42 * this.volume, t)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12)
+        osc.connect(gain)
+        gain.connect(this.masterGain)
+        osc.start(t)
+        osc.stop(t + 0.12)
+      } else if (hitType === 'fire') {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        osc.type = 'sawtooth'
+        osc.frequency.setValueAtTime(320, t)
+        osc.frequency.exponentialRampToValueAtTime(75, t + 0.15)
+        gain.gain.setValueAtTime(0.45 * this.volume, t)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15)
+        osc.connect(gain)
+        gain.connect(this.masterGain)
+        osc.start(t)
+        osc.stop(t + 0.15)
+      } else if (hitType === 'heavy' || hitType === 'slam') {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        osc.type = 'sawtooth'
+        osc.frequency.setValueAtTime(115, t)
+        osc.frequency.exponentialRampToValueAtTime(32, t + 0.25)
+        gain.gain.setValueAtTime(0.65 * this.volume, t)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25)
+        osc.connect(gain)
+        gain.connect(this.masterGain)
+        osc.start(t)
+        osc.stop(t + 0.25)
+      } else if (hitType === 'explosion') {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        osc.type = 'sawtooth'
+        osc.frequency.setValueAtTime(95, t)
+        osc.frequency.exponentialRampToValueAtTime(24, t + 0.32)
+        gain.gain.setValueAtTime(0.7 * this.volume, t)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32)
+        osc.connect(gain)
+        gain.connect(this.masterGain)
+        osc.start(t)
+        osc.stop(t + 0.32)
+      } else if (hitType === 'dot') {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(360, t)
+        osc.frequency.linearRampToValueAtTime(240, t + 0.05)
+        gain.gain.setValueAtTime(0.18 * this.volume, t)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05)
+        osc.connect(gain)
+        gain.connect(this.masterGain)
+        osc.start(t)
+        osc.stop(t + 0.05)
+      } else {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        osc.type = 'sawtooth'
+        osc.frequency.setValueAtTime(180, t)
+        osc.frequency.exponentialRampToValueAtTime(65, t + 0.14)
+        gain.gain.setValueAtTime(0.45 * this.volume, t)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14)
+        osc.connect(gain)
+        gain.connect(this.masterGain)
+        osc.start(t)
+        osc.stop(t + 0.14)
+      }
+    } catch (e) {}
+  },
+  hitEnemy(isCrit = false, weaponType = 'sword', isBoss = false) {
+    this._lastHitRecord = { isCrit, weaponType, isBoss, count: ((this._lastHitRecord && this._lastHitRecord.count) || 0) + 1 }
+    if (!this.enabled || isHeadless) return
+    this.init()
+    this.resume()
+    if (!this.ctx || !this.masterGain) return
+
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    if (this._lastHitEnemyTime && now - this._lastHitEnemyTime < 24) {
+      if (!isCrit && !isBoss) return
+    }
+    this._lastHitEnemyTime = now
+
+    try {
+      const t = this.ctx.currentTime
+      const pitchVar = 0.92 + Math.random() * 0.16
+
+      if (isCrit) {
+        // --- 暴击裂甲多巴胺复合音 (高频破甲金鸣 + 沉闷低音轰击 + 灵光回响) ---
+        const oscHigh = this.ctx.createOscillator()
+        const gainHigh = this.ctx.createGain()
+        oscHigh.type = 'triangle'
+        oscHigh.frequency.setValueAtTime(1420 * pitchVar, t)
+        oscHigh.frequency.exponentialRampToValueAtTime(320 * pitchVar, t + 0.13)
+        gainHigh.gain.setValueAtTime(0.55 * this.volume, t)
+        gainHigh.gain.exponentialRampToValueAtTime(0.001, t + 0.13)
+        oscHigh.connect(gainHigh)
+        gainHigh.connect(this.masterGain)
+        oscHigh.start(t)
+        oscHigh.stop(t + 0.13)
+
+        const oscLow = this.ctx.createOscillator()
+        const gainLow = this.ctx.createGain()
+        oscLow.type = 'sawtooth'
+        oscLow.frequency.setValueAtTime(180 * pitchVar, t)
+        oscLow.frequency.exponentialRampToValueAtTime(36, t + 0.22)
+        gainLow.gain.setValueAtTime(0.65 * this.volume, t)
+        gainLow.gain.exponentialRampToValueAtTime(0.001, t + 0.22)
+        oscLow.connect(gainLow)
+        gainLow.connect(this.masterGain)
+        oscLow.start(t)
+        oscLow.stop(t + 0.22)
+
+        const oscRing = this.ctx.createOscillator()
+        const gainRing = this.ctx.createGain()
+        oscRing.type = 'sine'
+        oscRing.frequency.setValueAtTime(880 * pitchVar, t + 0.015)
+        oscRing.frequency.linearRampToValueAtTime(1160 * pitchVar, t + 0.16)
+        gainRing.gain.setValueAtTime(0.001, t)
+        gainRing.gain.setValueAtTime(0.26 * this.volume, t + 0.015)
+        gainRing.gain.exponentialRampToValueAtTime(0.001, t + 0.16)
+        oscRing.connect(gainRing)
+        gainRing.connect(this.masterGain)
+        oscRing.start(t + 0.015)
+        oscRing.stop(t + 0.16)
+      } else {
+        // --- 普通命中打击音 (刀肉切割 / 钝击破甲 + 微低频打击感) ---
+        let startFreq = 500
+        let endFreq = 130
+        let waveType = 'sawtooth'
+
+        if (weaponType === 'hammer' || weaponType === 'ding' || isBoss) {
+          startFreq = 260
+          endFreq = 50
+          waveType = 'triangle'
+        } else if (weaponType === 'fist' || weaponType === 'dragon_armor') {
+          startFreq = 340
+          endFreq = 80
+          waveType = 'square'
+        } else if (weaponType === 'staff' || weaponType === 'spell' || weaponType === 'robe') {
+          startFreq = 440
+          endFreq = 160
+          waveType = 'sine'
+        }
+
+        const oscMain = this.ctx.createOscillator()
+        const gainMain = this.ctx.createGain()
+        oscMain.type = waveType
+        oscMain.frequency.setValueAtTime(startFreq * pitchVar, t)
+        oscMain.frequency.exponentialRampToValueAtTime(Math.max(25, endFreq * pitchVar), t + 0.08)
+        gainMain.gain.setValueAtTime((isBoss ? 0.48 : 0.38) * this.volume, t)
+        gainMain.gain.exponentialRampToValueAtTime(0.001, t + 0.08)
+        oscMain.connect(gainMain)
+        gainMain.connect(this.masterGain)
+        oscMain.start(t)
+        oscMain.stop(t + 0.08)
+
+        // 辅助肉质低频沉入感
+        const oscThump = this.ctx.createOscillator()
+        const gainThump = this.ctx.createGain()
+        oscThump.type = 'sine'
+        oscThump.frequency.setValueAtTime(115 * pitchVar, t)
+        oscThump.frequency.exponentialRampToValueAtTime(40, t + 0.06)
+        gainThump.gain.setValueAtTime(0.3 * this.volume, t)
+        gainThump.gain.exponentialRampToValueAtTime(0.001, t + 0.06)
+        oscThump.connect(gainThump)
+        gainThump.connect(this.masterGain)
+        oscThump.start(t)
+        oscThump.stop(t + 0.06)
+      }
+    } catch (e) {}
+  },
+  defeat(isBoss = false, isElite = false) {
     if (!this.enabled || isHeadless) return
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
-    if (this._lastDefeatSound && now - this._lastDefeatSound < 45) return
+    if (this._lastDefeatSound && now - this._lastDefeatSound < 45 && !isBoss && !isElite) return
     this._lastDefeatSound = now
-    this.playTone(420, 'sine', 0.18, 0.4, 180)
+
+    if (isBoss || isElite) {
+      this.playTone(160, 'sawtooth', 0.35, 0.65, 30)
+      setTimeout(() => {
+        this.playTone(380, 'sine', 0.28, 0.45, 120)
+      }, 50)
+    } else {
+      this.playTone(320, 'sine', 0.16, 0.38, 540)
+    }
+  },
+  enemyShoot(type = 'default') {
+    this._lastEnemyShoot = { type, time: Date.now() }
+    if (!this.enabled || isHeadless) return
+    this.init()
+    this.resume()
+    if (!this.ctx || !this.masterGain) return
+
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    if (this._lastEnemyShootTimes && this._lastEnemyShootTimes[type] && now - this._lastEnemyShootTimes[type] < 45) return
+    if (!this._lastEnemyShootTimes) this._lastEnemyShootTimes = {}
+    this._lastEnemyShootTimes[type] = now
+
+    try {
+      const t = this.ctx.currentTime
+      if (type === 'frost_crystal') {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(1050, t)
+        osc.frequency.exponentialRampToValueAtTime(360, t + 0.10)
+        gain.gain.setValueAtTime(0.34 * this.volume, t)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10)
+        osc.connect(gain)
+        gain.connect(this.masterGain)
+        osc.start(t)
+        osc.stop(t + 0.10)
+      } else if (type === 'fireball' || type === 'magma') {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        osc.type = 'sawtooth'
+        osc.frequency.setValueAtTime(240, t)
+        osc.frequency.exponentialRampToValueAtTime(80, t + 0.14)
+        gain.gain.setValueAtTime(0.38 * this.volume, t)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14)
+        osc.connect(gain)
+        gain.connect(this.masterGain)
+        osc.start(t)
+        osc.stop(t + 0.14)
+      } else if (type === 'corpse_knuckle' || type === 'bonespike') {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        osc.type = 'square'
+        osc.frequency.setValueAtTime(420, t)
+        osc.frequency.exponentialRampToValueAtTime(130, t + 0.08)
+        gain.gain.setValueAtTime(0.32 * this.volume, t)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08)
+        osc.connect(gain)
+        gain.connect(this.masterGain)
+        osc.start(t)
+        osc.stop(t + 0.08)
+      } else if (type === 'asura_soul' || type === 'corpse_ghost_fire') {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(520, t)
+        osc.frequency.exponentialRampToValueAtTime(220, t + 0.20)
+        gain.gain.setValueAtTime(0.36 * this.volume, t)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.20)
+        osc.connect(gain)
+        gain.connect(this.masterGain)
+        osc.start(t)
+        osc.stop(t + 0.20)
+      } else if (type === 'feather') {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(840, t)
+        osc.frequency.exponentialRampToValueAtTime(320, t + 0.09)
+        gain.gain.setValueAtTime(0.32 * this.volume, t)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09)
+        osc.connect(gain)
+        gain.connect(this.masterGain)
+        osc.start(t)
+        osc.stop(t + 0.09)
+      } else if (type === 'cosmic_blade') {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(740, t)
+        osc.frequency.exponentialRampToValueAtTime(250, t + 0.15)
+        gain.gain.setValueAtTime(0.35 * this.volume, t)
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15)
+        osc.connect(gain)
+        gain.connect(this.masterGain)
+        osc.start(t)
+        osc.stop(t + 0.15)
+      } else {
+        this.playTone(460, 'triangle', 0.11, 0.35, 160)
+      }
+    } catch (e) {}
+  },
+  enemySlam(type = 'slam') {
+    this._lastEnemySlam = { type, time: Date.now() }
+    if (!this.enabled || isHeadless) return
+    if (type === 'rush') {
+      this.playTone(150, 'sawtooth', 0.36, 0.65, 42)
+    } else if (type === 'stomp') {
+      this.playTone(95, 'sawtooth', 0.26, 0.6, 32)
+    } else {
+      this.playTone(85, 'sawtooth', 0.32, 0.7, 28)
+    }
+  },
+  enemyAoE(type = 'explosion') {
+    this._lastEnemyAoE = { type, time: Date.now() }
+    if (!this.enabled || isHeadless) return
+    if (type === 'blackhole_cast') {
+      this.playTone(120, 'sine', 0.35, 0.45, 90)
+    } else if (type === 'laser') {
+      this.playTone(620, 'sawtooth', 0.28, 0.48, 480)
+    } else {
+      this.playTone(90, 'sawtooth', 0.42, 0.75, 22)
+    }
   },
   slam() {
     this.playTone(85, 'sawtooth', 0.28, 0.65, 35)
@@ -824,13 +1138,13 @@ const characters = [
         id: 'body_armor',
         name: '龙鳞霸甲',
         icon: '🥋',
-        desc: '金甲护体，生命上限 +20，身前轰出赤金龙炎，拳心贯穿重伤，边缘扩散递减',
+        desc: '金甲护体，生命上限 +20。首发真龙金拳破空贯通，随后漫天虚影重拳暴风连击2秒（每0.25秒造成20%拳伤）',
         type: 'dragon_armor',
         bulletColor: '#f2b836',
         bulletRadius: 6,
         bulletSpeed: 390,
         shootInterval: 0.85,
-        stats: { dmg: 14, spd: '1.2/s', rng: '115px', feat: '赤金龙炎 · 拳心贯穿/掠击衰减' },
+        stats: { dmg: 14, spd: '1.2/s', rng: '115px', feat: '真龙霸拳 · 实体贯穿/虚影连击' },
         apply: (g) => { g.attack = 14; g.bonusHp += 20; if (typeof recomputeMaxHp === 'function') recomputeMaxHp() }
       },
       {
@@ -1432,12 +1746,13 @@ function spawnDamageNumber(x, y, text, kind = 'enemy', opts = {}) {
   })
 }
 
-function damageEnemy(enemy, amount, color = '#ffd166') {
+function damageEnemy(enemy, amount, color = '#ffd166', options = {}) {
   if (!enemy || enemy.hp <= 0) return
+  const isDoT = Boolean(options && (options.isDoT || options.isTick || options.noFeedback))
   if (typeof recordTestDamage === 'function') {
     recordTestDamage(amount, enemy)
   }
-  if (typeof game !== 'undefined' && game && game._currentAttackIsPrimary) {
+  if (!isDoT && typeof game !== 'undefined' && game && game._currentAttackIsPrimary) {
     if ((game.chainArcLevel || 0) > 0) {
       triggerChainArc(enemy, amount)
     }
@@ -1447,13 +1762,13 @@ function damageEnemy(enemy, amount, color = '#ffd166') {
   }
   if (enemy.isBoss && typeof damageBoss === 'function') {
     damageBoss(amount)
-    if (!isHeadless && typeof spawnHitImpact === 'function') {
-      spawnHitImpact(enemy.x, enemy.y, color || '#ffbe0b', 7)
-    }
     return
   }
+
+  const curWType = (game.player && (game.player.weaponType || (game.weapons && game.weapons[0] && (game.weapons[0].weaponType || game.weapons[0].id)))) || 'sword'
+
   if (enemy.isBossPart) {
-    const crit = rollCrit()
+    const crit = isDoT ? { is: false, mult: 1 } : rollCrit()
     const dmg = Math.max(1, Math.round(amount * crit.mult))
     enemy.hp -= dmg
     if (enemy.armRef) {
@@ -1461,8 +1776,28 @@ function damageEnemy(enemy, amount, color = '#ffd166') {
       enemy.armRef.hit = 0.16
     }
     enemy.hit = Math.max(enemy.hit || 0, 0.16)
+
+    if (!isDoT && typeof sound !== 'undefined' && sound.hitEnemy) {
+      sound.hitEnemy(crit.is, curWType, true)
+    }
+    if (crit.is && !isDoT) {
+      const now = game.elapsed || 0
+      if (!game._lastHitstopTime || now - game._lastHitstopTime > 0.08) {
+        game._lastHitstopTime = now
+        game.hitstop = 0.035
+      }
+      game.cameraShake = Math.max(game.cameraShake || 0, 0.08)
+      if (!isHeadless && typeof pulseGamepad === 'function') {
+        pulseGamepad(0.2, 0.32, 65)
+      }
+    }
+
     if (!isHeadless && typeof spawnHitImpact === 'function') {
-      spawnHitImpact(enemy.x, enemy.y, color || '#06d6a0', crit.is ? 9 : 5)
+      if (isDoT) {
+        if (Math.random() < 0.25) spawnHitImpact(enemy.x, enemy.y, color || '#06d6a0', 2, false)
+      } else {
+        spawnHitImpact(enemy.x, enemy.y, color || '#06d6a0', crit.is ? 12 : 6, crit.is)
+      }
     }
     spawnDamageNumber(
       enemy.x + (Math.random() - 0.5) * 16,
@@ -1474,15 +1809,58 @@ function damageEnemy(enemy, amount, color = '#ffd166') {
     if (enemy.hp <= 0) defeat(enemy)
     return
   }
-  const crit = rollCrit()
+
+  const crit = isDoT ? { is: false, mult: 1 } : rollCrit()
   const dmg = Math.max(1, Math.round(amount * crit.mult))
   enemy.hp -= amount * crit.mult
   if (enemy.isDummy && enemy.immortal) {
     enemy.hp = enemy.maxHp
   }
   enemy.hit = Math.max(enemy.hit || 0, 0.16)
+
+  // 1. 物理微击退反馈 (非Boss实体直接受创产生微冲力后坐；DoT灼烧/持续伤害不产生击退，杜绝全场怪高频抽搐)
+  if (!enemy.isDummy && !isDoT && (!isHeadless || globalThis.__FORCE_VISUAL_FX__)) {
+    const px = (game.player && game.player.x != null) ? game.player.x : (enemy.x - 1)
+    const py = (game.player && game.player.y != null) ? game.player.y : enemy.y
+    const kx = enemy.x - px
+    const ky = enemy.y - py
+    const kLen = Math.hypot(kx, ky) || 1
+    const isElite = enemy.isElite || enemy.kind === 'elite_brute' || enemy.kind === 'elite_frost_brute'
+    const isBrute = enemy.kind === 'brute' || isElite
+    let pushDist = isElite ? 3.5 : (isBrute ? 7 : 12)
+    if (crit.is) pushDist *= 1.35
+    enemy.x += (kx / kLen) * pushDist
+    enemy.y += (ky / kLen) * pushDist
+    const margin = enemy.r || 14
+    enemy.x = Math.max(margin, Math.min(ARENA_WIDTH - margin, enemy.x))
+    enemy.y = Math.max(margin, Math.min(ARENA_HEIGHT - margin, enemy.y))
+  }
+
+  // 2. 真实打击音效 (DoT不触发刀肉劈砍音效)
+  if (!isDoT && typeof sound !== 'undefined' && sound.hitEnemy) {
+    sound.hitEnemy(crit.is, curWType, false)
+  }
+
+  // 3. 暴击高光与微顿帧 (Hitstop & Camera Shake，仅非DoT直接命中有效，防叠节流)
+  if (crit.is && !isDoT) {
+    const now = game.elapsed || 0
+    if (!game._lastHitstopTime || now - game._lastHitstopTime > 0.08) {
+      game._lastHitstopTime = now
+      game.hitstop = 0.035
+    }
+    game.cameraShake = Math.max(game.cameraShake || 0, 0.08)
+    if (!isHeadless && typeof pulseGamepad === 'function') {
+      pulseGamepad(0.2, 0.32, 65)
+    }
+  }
+
+  // 4. 绚丽受击火花与星芒爆破 (DoT只产生微弱余烬，不产生全屏星芒)
   if (!isHeadless && typeof spawnHitImpact === 'function') {
-    spawnHitImpact(enemy.x, enemy.y, color, crit.is ? 9 : 4)
+    if (isDoT) {
+      if (Math.random() < 0.25) spawnHitImpact(enemy.x, enemy.y, color, 2, false)
+    } else {
+      spawnHitImpact(enemy.x, enemy.y, color, crit.is ? 12 : 5, crit.is)
+    }
   }
   spawnDamageNumber(
     enemy.x + (Math.random() - 0.5) * 16,
@@ -1548,6 +1926,8 @@ function drawWeaponSpriteOrFallback(ctx, wType, x, y, angle, size = 44, glowColo
       angleOffset = Math.PI * 0.20
     } else if (wType === 'ghost_banner' || wType === 'formation_flag') {
       angleOffset = -Math.PI * 0.15
+    } else if (wType === 'dragon_armor') {
+      angleOffset = -Math.PI * 0.75 // image knuckles at +135 deg (+0.75pi), rotate -135 deg (-0.75pi) to point knuckles along flight direction
     }
     ctx.rotate(angle + angleOffset)
     ctx.shadowColor = glowColor
@@ -1768,7 +2148,7 @@ function executeWeaponAttack(target, angleOffset = 0, damage = game.attack, colo
     return
   }
 
-  // --- 3. 龙鳞霸甲 (Dragon Armor): 狂龙出海 赤龙拳劲破空贯通 ---
+  // --- 3. 龙鳞霸甲 (Dragon Armor): 狂龙出海 首发实体拳 · 随后漫天虚影暴风连拳 (持续2s/每0.25s造成20%拳伤) ---
   if (wType === 'dragon_armor') {
     const range = 115 + (game.dragonRangeBonus || 0)
     game.specialAttacks.push({
@@ -1778,11 +2158,23 @@ function executeWeaponAttack(target, angleOffset = 0, damage = game.attack, colo
       angle,
       range,
       progress: 0,
+      damage: actualDamage,
+      color: '#f2b836',
+      // 实体拳头系统 (首发出击 100% 贯通伤害)
+      solidDuration: 0.32,
+      solidLife: 0.32,
       duration: 0.32,
       life: 0.32,
-      damage: actualDamage,
       hitEnemies: new Set(),
-      color: '#f2b836'
+      // 虚影拳头系统 (随后飞出漫天拳影，持续 2.0s，每 0.25s 造成实体伤害的 20%)
+      phantomDuration: 2.0,
+      phantomTimer: 2.0,
+      phantomTickInterval: 0.25,
+      phantomTickTimer: 0.25,
+      phantomTicksDone: 0,
+      phantomDamageRatio: 0.2,
+      phantomSpawnTimer: 0.05,
+      phantomFists: []
     })
     if (!isHeadless) sound.dragon?.()
     return
@@ -2415,25 +2807,122 @@ function updateSpecialAttacks(dt) {
       }
     }
 
-    // 3. 龙鳞霸甲 (Dragon Armor): 赤龙冲拳贯通
+    // 3. 龙鳞霸甲 (Dragon Armor): 狂龙出海 首发实体拳贯穿 + 随后漫天虚影暴风连击 (持续2s，每0.5s造成20%拳伤)
     else if (atk.type === 'dragon_fist') {
-      atk.life -= dt
-      const prog = 1 - Math.max(0, atk.life / atk.duration)
-      const curDist = atk.range * prog
-      const tipX = atk.x + Math.cos(atk.angle) * curDist
-      const tipY = atk.y + Math.sin(atk.angle) * curDist
+      if (p) {
+        atk.x = p.x
+        atk.y = p.y
+      }
 
-      for (const enemy of game.enemies) {
-        const d = distance({ x: tipX, y: tipY }, enemy)
-        if (!atk.hitEnemies.has(enemy) && d < 28 + (enemy.r || 12)) {
-          atk.hitEnemies.add(enemy)
-          // 龙拳拳心基准伤害，外圈掠伤衰减至 0.55x
-          const falloff = d <= 18 ? 1.0 : Math.max(0.55, 1.0 - ((d - 18) / 26) * 0.45)
-          damageEnemy(enemy, atk.damage * falloff, atk.color)
-          burst(enemy.x, enemy.y, atk.color, 4, 25)
+      // A. 实体拳头推进与伤害结算 (Solid Fist: 100% 贯穿打击)
+      if (atk.solidLife > 0) {
+        atk.solidLife -= dt
+        atk.life = atk.solidLife
+        const solidProg = 1 - Math.max(0, atk.solidLife / atk.solidDuration)
+        atk.progress = solidProg
+        const solidDist = atk.range * solidProg
+        const tipX = atk.x + Math.cos(atk.angle) * solidDist
+        const tipY = atk.y + Math.sin(atk.angle) * solidDist
+        atk.solidTipX = tipX
+        atk.solidTipY = tipY
+
+        for (const enemy of game.enemies) {
+          const d = distance({ x: tipX, y: tipY }, enemy)
+          if (!atk.hitEnemies.has(enemy) && d < 30 + (enemy.r || 12)) {
+            atk.hitEnemies.add(enemy)
+            damageEnemy(enemy, atk.damage, atk.color)
+            burst(enemy.x, enemy.y, atk.color, 6, 28)
+            enemy.x += Math.cos(atk.angle) * 10
+            enemy.y += Math.sin(atk.angle) * 10
+            if (!isHeadless) sound.hit?.()
+          }
+        }
+      } else {
+        atk.solidLife = 0
+        atk.life = 0
+      }
+
+      // B. 虚影拳头系统推进 (Phantom Fists: 持续 2.0s，每 0.25s 造成实体伤害的 20%)
+      const maxTicks = Math.round((atk.phantomDuration || 2.0) / (atk.phantomTickInterval || 0.25)) // 2.0 / 0.25 = 8
+      if (atk.phantomTimer > 0 || (atk.phantomTicksDone || 0) < maxTicks) {
+        if (atk.phantomTimer > 0) {
+          atk.phantomTimer -= dt
+
+          // 持续高频发射飞行的半透明拳影
+          atk.phantomSpawnTimer -= dt
+          if (atk.phantomSpawnTimer <= 0) {
+            atk.phantomSpawnTimer = 0.06 + Math.random() * 0.04
+            const spawnCount = Math.random() < 0.4 ? 2 : 1
+            for (let k = 0; k < spawnCount; k++) {
+              const spreadAngle = atk.angle + (Math.random() - 0.5) * 0.32
+              const sideOffset = (Math.random() - 0.5) * 26
+              const forwardOffset = 12 + Math.random() * 16
+              const sx = atk.x + Math.cos(atk.angle) * forwardOffset - Math.sin(atk.angle) * sideOffset
+              const sy = atk.y + Math.sin(atk.angle) * forwardOffset + Math.cos(atk.angle) * sideOffset
+              atk.phantomFists.push({
+                x: sx,
+                y: sy,
+                angle: spreadAngle,
+                speed: 280 + Math.random() * 90,
+                dist: 0,
+                maxDist: atk.range * (0.85 + Math.random() * 0.35),
+                life: 0.36 + Math.random() * 0.1,
+                duration: 0.42,
+                size: 28 + Math.random() * 10,
+                color: Math.random() > 0.38 ? '#f2b836' : '#ff7a29'
+              })
+            }
+          }
+        }
+
+        // 虚影周期伤害结算：每 0.25s 造成实体拳伤害的 20%
+        if ((atk.phantomTicksDone || 0) < maxTicks) {
+          atk.phantomTickTimer -= dt
+          while (atk.phantomTickTimer <= 0 && (atk.phantomTicksDone || 0) < maxTicks) {
+            atk.phantomTickTimer += (atk.phantomTickInterval || 0.25)
+            atk.phantomTicksDone = (atk.phantomTicksDone || 0) + 1
+            const tickDmg = Math.max(1, atk.damage * (atk.phantomDamageRatio || 0.2))
+
+            const cosA = Math.cos(atk.angle)
+            const sinA = Math.sin(atk.angle)
+            let hitAny = false
+
+            for (const enemy of game.enemies) {
+              const dx = enemy.x - atk.x
+              const dy = enemy.y - atk.y
+              const forward = dx * cosA + dy * sinA
+              const lateral = Math.abs(-dx * sinA + dy * cosA)
+
+              if (forward >= -15 && forward <= atk.range + 35 && lateral <= 42 + (enemy.r || 12)) {
+                damageEnemy(enemy, tickDmg, '#ff9800')
+                burst(enemy.x, enemy.y, '#f59e0b', 3, 18)
+                enemy.x += cosA * 4
+                enemy.y += sinA * 4
+                hitAny = true
+              }
+            }
+            if (hitAny && !isHeadless) sound.hit?.()
+          }
         }
       }
-      if (atk.life <= 0) atk.finished = true
+
+      // C. 驱动存活的虚影拳头粒子推进
+      for (let i = atk.phantomFists.length - 1; i >= 0; i--) {
+        const fist = atk.phantomFists[i]
+        fist.life -= dt
+        const stepDist = fist.speed * dt
+        fist.dist += stepDist
+        fist.x += Math.cos(fist.angle) * stepDist
+        fist.y += Math.sin(fist.angle) * stepDist
+        if (fist.life <= 0 || fist.dist >= fist.maxDist) {
+          atk.phantomFists.splice(i, 1)
+        }
+      }
+
+      // D. 全部阶段结束销毁判定
+      if (atk.solidLife <= 0 && atk.phantomTimer <= 0 && (atk.phantomTicksDone || 0) >= maxTicks && atk.phantomFists.length === 0) {
+        atk.finished = true
+      }
     }
 
     // 4. 疾风残刃 (Daggers): 翡翠飞刀回旋斩 (Flying Dagger Boomerang)
@@ -3458,7 +3947,7 @@ function updateBlazingFire(dt) {
       if (e.flameBurnTick >= 0.3) {
         e.flameBurnTick = 0
         const burnDmg = Math.max(1, Math.round((e.flameBrandDmg || game.attack || 28) * (params.burnDmgPct / 100) * 0.3))
-        damageEnemy(e, burnDmg, '#ff6700')
+        damageEnemy(e, burnDmg, '#ff6700', { isDoT: true })
         if (!isHeadless) {
           burst(e.x + rand(-8, 8), e.y + rand(-8, 8), '#ffa200', 2, 14)
         }
@@ -3786,37 +4275,87 @@ function drawSpecialAttacks(ctx) {
       }
     }
 
-    // 3. 龙鳞霸甲 (Dragon Armor)
+    // 3. 龙鳞霸甲 (Dragon Armor): 实体霸龙金拳 + 持续2s赤金龙气狂涛 + 漫天虚影重拳暴风连击
     else if (atk.type === 'dragon_fist') {
-      const prog = 1 - Math.max(0, atk.life / atk.duration)
-      const alpha = Math.max(0, 1 - prog)
-      const curDist = atk.range * prog
-      const tipX = atk.x + Math.cos(atk.angle) * curDist
-      const tipY = atk.y + Math.sin(atk.angle) * curDist
+      const cosA = Math.cos(atk.angle)
+      const sinA = Math.sin(atk.angle)
 
-      ctx.save()
-      ctx.translate(atk.x, atk.y)
-      ctx.rotate(atk.angle)
+      // A. 身前赤金龙气狂涛光带 (随着虚影攻击持续脉动)
+      const isChanneling = (atk.phantomTimer > 0) || (atk.solidLife > 0)
+      if (isChanneling) {
+        ctx.save()
+        ctx.translate(atk.x, atk.y)
+        ctx.rotate(atk.angle)
+        const channelAlpha = atk.phantomTimer > 0
+          ? Math.min(0.46, 0.16 + (atk.phantomTimer / atk.phantomDuration) * 0.28)
+          : Math.max(0, atk.solidLife / atk.solidDuration) * 0.46
+        const tunnelDist = atk.range + 30
+        const grad = ctx.createLinearGradient(0, 0, tunnelDist, 0)
+        grad.addColorStop(0, `rgba(255, 95, 20, ${channelAlpha * 0.35})`)
+        grad.addColorStop(0.65, `rgba(242, 184, 54, ${channelAlpha * 0.72})`)
+        grad.addColorStop(1, `rgba(255, 230, 140, ${channelAlpha * 0.12})`)
+        ctx.fillStyle = grad
+        ctx.beginPath()
+        ctx.moveTo(0, -15)
+        ctx.lineTo(tunnelDist, -35)
+        ctx.lineTo(tunnelDist, 35)
+        ctx.lineTo(0, 15)
+        ctx.closePath()
+        ctx.fill()
+        ctx.restore()
+      }
 
-      // 烈焰龙息光带
-      const grad = ctx.createLinearGradient(0, 0, curDist, 0)
-      grad.addColorStop(0, 'rgba(255, 100, 20, 0.15)')
-      grad.addColorStop(0.7, 'rgba(242, 184, 54, 0.45)')
-      grad.addColorStop(1, 'rgba(255, 230, 140, 0.85)')
-      ctx.fillStyle = grad
-      ctx.beginPath()
-      ctx.moveTo(0, -12)
-      ctx.lineTo(curDist, -28)
-      ctx.lineTo(curDist, 28)
-      ctx.lineTo(0, 12)
-      ctx.closePath()
-      ctx.fill()
-      ctx.restore()
+      // B. 实体拳头 (Solid Fist: 金芒璀璨真龙金拳)
+      if (atk.solidLife > 0) {
+        const solidProg = 1 - Math.max(0, atk.solidLife / (atk.solidDuration || 0.32))
+        const solidDist = atk.range * solidProg
+        const tipX = atk.x + cosA * solidDist
+        const tipY = atk.y + sinA * solidDist
 
-      // 龙头金影
-      drawWeaponSpriteOrFallback(ctx, 'dragon_armor', tipX, tipY, atk.angle, 40, '#f2b836', (c, x, y, a) => {
-        if (typeof drawDragonArmorEntity === 'function') drawDragonArmorEntity(c, x, y, a, 1.25)
-      })
+        // 实体拳金芒龙首光环
+        ctx.save()
+        ctx.shadowColor = '#f2b836'
+        ctx.shadowBlur = 18
+        ctx.fillStyle = 'rgba(255, 215, 0, 0.35)'
+        ctx.beginPath()
+        ctx.arc(tipX, tipY, 20, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+
+        // 实体拳头贴图（饱满大金拳，尺寸 46）
+        drawWeaponSpriteOrFallback(ctx, 'dragon_armor', tipX, tipY, atk.angle, 46, '#f2b836', (c, x, y, a) => {
+          if (typeof drawDragonArmorEntity === 'function') drawDragonArmorEntity(c, x, y, a, 1.35)
+        })
+      }
+
+      // C. 飞行中的多个半透明虚影拳头 (Phantom Fists)
+      if (atk.phantomFists && atk.phantomFists.length > 0) {
+        for (const fist of atk.phantomFists) {
+          ctx.save()
+          const fRatio = fist.duration > 0 ? (fist.life / fist.duration) : 1
+          const fAlpha = Math.sin(Math.max(0, Math.min(1, fRatio)) * Math.PI) * 0.75
+          ctx.globalAlpha = Math.max(0.12, Math.min(1, fAlpha))
+
+          // 虚影残焰拖尾
+          const tailLen = 15
+          const tailX = fist.x - Math.cos(fist.angle) * tailLen
+          const tailY = fist.y - Math.sin(fist.angle) * tailLen
+          ctx.strokeStyle = fist.color || '#f2b836'
+          ctx.lineWidth = 2.5
+          ctx.shadowColor = fist.color || '#f2b836'
+          ctx.shadowBlur = 8
+          ctx.beginPath()
+          ctx.moveTo(tailX, tailY)
+          ctx.lineTo(fist.x, fist.y)
+          ctx.stroke()
+
+          // 虚影拳头贴图（半透明飘逸拳影）
+          drawWeaponSpriteOrFallback(ctx, 'dragon_armor', fist.x, fist.y, fist.angle, fist.size || 34, fist.color || '#f2b836', (c, x, y, a) => {
+            if (typeof drawDragonArmorEntity === 'function') drawDragonArmorEntity(c, x, y, a, 1.0)
+          })
+          ctx.restore()
+        }
+      }
     }
 
     // 4. 疾风残刃 (Daggers): 翡翠飞刀本体自旋回旋
@@ -5257,57 +5796,61 @@ const BOSS_CONFIGS = {
     id: 'asura_demon',
     name: '九天噬魂魔尊',
     title: '元婴境领主 · 虚空真魔',
-    lore: '撕裂域外虚空降临凡界的元神巨魔，吞纳万千修士精魂。三头六臂，魔气滔天，擅使空间崩塌与魔魂弹幕。',
-    r: 50,
+    lore: '撕裂域外虚空降临凡界的元神巨魔，吞纳万千修士精魂。三头六臂，魔气滔天，擅使空间崩塌、噬魂黑洞与灭世神光。',
+    r: 58,
     color: '#7209b7',
     secondaryColor: '#f72585',
-    auraColor: 'rgba(114, 9, 183, 0.5)',
+    auraColor: 'rgba(114, 9, 183, 0.55)',
     spriteKey: 'asura_demon',
     phases: [
       {
         phaseIndex: 0,
-        name: '天魔幻象',
+        name: '天魔初醒 · 噬魂追踪',
         hp: 18000,
-        speed: 70,
+        speed: 75,
         damage: 28,
         rushSpeed: 480,
         rushDuration: 0.4,
         telegraphTime: 0.75,
-        attackCooldowns: { melee: 5.2, barrage: 3.8, aoe: 6.0 },
-        barrageCount: 8,
-        aoeCount: 3,
-        aoeRadius: 65
+        attackCooldowns: { melee: 5.5, barrage: 3.6, aoe: 99.0 },
+        barrageCount: 10,
+        aoeCount: 0,
+        aoeRadius: 0
       },
       {
         phaseIndex: 1,
-        name: '噬魂魔躯',
+        name: '虚空引力 · 噬魂黑洞',
         hp: 26000,
-        speed: 90,
+        speed: 85,
         damage: 38,
-        rushSpeed: 560,
+        rushSpeed: 540,
         rushDuration: 0.45,
         telegraphTime: 0.6,
-        attackCooldowns: { melee: 3.8, barrage: 2.6, aoe: 4.5 },
-        barrageCount: 14,
-        aoeCount: 5,
-        aoeRadius: 75,
-        singularity: true
+        attackCooldowns: { melee: 4.8, barrage: 3.2, aoe: 5.2 },
+        barrageCount: 12,
+        aoeCount: 1,
+        aoeRadius: 105,
+        blackhole: true
       },
       {
         phaseIndex: 2,
-        name: '天崩地裂 · 终焉天魔',
+        name: '六极崩灭 · 终焉天魔',
         hp: 36000,
-        speed: 105,
+        speed: 95,
         damage: 48,
-        rushSpeed: 620,
-        rushDuration: 0.5,
-        telegraphTime: 0.45,
-        attackCooldowns: { melee: 2.6, barrage: 1.8, aoe: 3.0 },
-        barrageCount: 22,
-        aoeCount: 7,
-        aoeRadius: 85,
-        singularity: true,
-        teleport: true
+        rushSpeed: 580,
+        rushDuration: 0.48,
+        telegraphTime: 0.5,
+        attackCooldowns: { melee: 4.2, barrage: 2.8, aoe: 5.0 },
+        barrageCount: 16,
+        aoeCount: 1,
+        aoeRadius: 105,
+        blackhole: true,
+        hexLaser: true,
+        laserCooldown: 12.0,
+        laserDuration: 6.0,
+        laserTelegraph: 1.6,
+        laserRotateSpeed: 0.42
       }
     ]
   },
@@ -5439,6 +5982,16 @@ let bossCorpseGhostFireLoaded = false
 let bossCorpsePoisonPoolImg = null
 let bossCorpsePoisonPoolLoaded = false
 
+// 九天噬魂魔尊专属贴图与特效
+let bossAsuraDemonImg = null
+let bossAsuraDemonLoaded = false
+let bossAsuraDemonSheetImg = null
+let bossAsuraDemonSheetLoaded = false
+let effectAsuraSoulImg = null
+let effectAsuraSoulLoaded = false
+let effectAsuraBlackholeImg = null
+let effectAsuraBlackholeLoaded = false
+
 if (typeof Image !== 'undefined') {
   bossRedDragonImg = new Image()
   bossRedDragonImg.src = './boss_red_dragon.png'
@@ -5479,6 +6032,22 @@ if (typeof Image !== 'undefined') {
   bossCorpsePoisonPoolImg = new Image()
   bossCorpsePoisonPoolImg.src = './effect_corpse_poison_pool.png'
   bossCorpsePoisonPoolImg.onload = () => { bossCorpsePoisonPoolLoaded = true }
+
+  bossAsuraDemonImg = new Image()
+  bossAsuraDemonImg.src = './boss_asura_demon.png'
+  bossAsuraDemonImg.onload = () => { bossAsuraDemonLoaded = true }
+
+  bossAsuraDemonSheetImg = new Image()
+  bossAsuraDemonSheetImg.src = './boss_asura_demon_sheet.png'
+  bossAsuraDemonSheetImg.onload = () => { bossAsuraDemonSheetLoaded = true }
+
+  effectAsuraSoulImg = new Image()
+  effectAsuraSoulImg.src = './effect_asura_soul.png'
+  effectAsuraSoulImg.onload = () => { effectAsuraSoulLoaded = true }
+
+  effectAsuraBlackholeImg = new Image()
+  effectAsuraBlackholeImg.src = './effect_asura_blackhole.png'
+  effectAsuraBlackholeImg.onload = () => { effectAsuraBlackholeLoaded = true }
 }
 
 /* ---------- 领主状态与生成逻辑 ---------- */
@@ -5656,8 +6225,9 @@ function fireCorpseKnuckleBarrage(arm, count = 5) {
       type: 'corpse_knuckle'
     })
   }
-  if (!isHeadless && typeof sound !== 'undefined' && sound.whirlwind) {
-    sound.whirlwind()
+  if (!isHeadless && typeof sound !== 'undefined') {
+    if (sound.enemyShoot) sound.enemyShoot('corpse_knuckle')
+    else if (sound.whirlwind) sound.whirlwind()
   }
 }
 
@@ -5685,8 +6255,9 @@ function fireCorpseSkullBreath(boss) {
     })
   }
   burst(boss.x, boss.y + 12, '#06d6a0', 16, 75)
-  if (!isHeadless && typeof sound !== 'undefined' && sound.dragon) {
-    sound.dragon()
+  if (!isHeadless && typeof sound !== 'undefined') {
+    if (sound.enemyShoot) sound.enemyShoot('fireball')
+    else if (sound.dragon) sound.dragon()
   }
 }
 
@@ -5713,8 +6284,9 @@ function fireCorpseSkullSpikeBurst(boss) {
     })
   }
   burst(boss.x, boss.y + 10, '#f8f9fa', 14, 85)
-  if (!isHeadless && typeof sound !== 'undefined' && sound.whirlwind) {
-    sound.whirlwind()
+  if (!isHeadless && typeof sound !== 'undefined') {
+    if (sound.enemyShoot) sound.enemyShoot('bonespike')
+    else if (sound.whirlwind) sound.whirlwind()
   }
 }
 
@@ -5736,6 +6308,9 @@ function fireCorpseGhostFire(arm) {
     turnSpeed: 1.6,
     type: 'corpse_ghost_fire'
   })
+  if (!isHeadless && typeof sound !== 'undefined' && sound.enemyShoot) {
+    sound.enemyShoot('corpse_ghost_fire')
+  }
 }
 
 function fireTriSkullGiantGhostFire(boss) {
@@ -5766,10 +6341,15 @@ function fireTriSkullGiantGhostFire(boss) {
       type: 'corpse_giant_ghost_fire'
     })
   }
-  burst(boss.x, boss.y, '#06d6a0', 20, 110)
+  burst(boss.x, boss.y + 14, '#06d6a0', 24, 110)
+  burst(boss.x, boss.y + 14, '#2ec4b6', 16, 85)
   if (!isHeadless) {
     game.cameraShake = 0.45
-    if (typeof sound !== 'undefined' && sound.dragon) sound.dragon()
+    if (typeof sound !== 'undefined' && sound.enemyShoot) {
+      sound.enemyShoot('corpse_ghost_fire')
+    } else if (typeof sound !== 'undefined' && sound.dragon) {
+      sound.dragon()
+    }
   }
 }
 
@@ -5837,7 +6417,10 @@ function updateCorpseEmperor(boss, dt) {
           arm.slamTimer = 0.4
           if (!isHeadless) {
             game.cameraShake = 0.4
-            if (typeof sound !== 'undefined' && sound.slam) sound.slam()
+            if (typeof sound !== 'undefined') {
+              if (sound.enemySlam) sound.enemySlam('slam')
+              else if (sound.slam) sound.slam()
+            }
           }
           burst(arm.x, arm.y, '#06d6a0', 18, 95)
           burst(arm.x, arm.y, '#f8f9fa', 12, 70)
@@ -5849,6 +6432,13 @@ function updateCorpseEmperor(boss, dt) {
             game.hp -= dmg
             game.player.invuln = 0.8
             burst(game.player.x, game.player.y, '#06d6a0', 10, 60)
+            if (typeof sound !== 'undefined' && sound.playerHurt) {
+              sound.playerHurt('heavy')
+            }
+            if (typeof pulseGamepad === 'function') pulseGamepad(0.5, 0.7, 240)
+            const kAngle = Math.atan2(game.player.y - arm.y, game.player.x - arm.x) || 0
+            game.player.x = Math.max(24, Math.min(ARENA_WIDTH - 24, game.player.x + Math.cos(kAngle) * 32))
+            game.player.y = Math.max(24, Math.min(ARENA_HEIGHT - 24, game.player.y + Math.sin(kAngle) * 32))
             addLog(`被白骨巨臂狂暴拍击命中，受到 ${Math.round(dmg)} 点范围伤害！`, true)
             if (game.hp <= 0) {
               endRun()
@@ -5974,7 +6564,10 @@ function updateCorpseEmperor(boss, dt) {
     if (boss.telegraphTimer <= 0) {
       boss.state = 'rushing'
       boss.rushTimeRemaining = boss.currentPhase.rushDuration || 0.45
-      if (typeof sound !== 'undefined') sound.whirlwind()
+      if (!isHeadless && typeof sound !== 'undefined') {
+        if (sound.enemySlam) sound.enemySlam('rush')
+        else if (sound.whirlwind) sound.whirlwind()
+      }
     }
     return
   } else if (boss.state === 'rushing') {
@@ -5992,8 +6585,16 @@ function updateCorpseEmperor(boss, dt) {
       game.hp -= dmg
       game.player.invuln = 0.85
       game.cameraShake = 0.5
-      if (typeof sound !== 'undefined') sound.crash()
+      if (typeof sound !== 'undefined') {
+        if (sound.playerHurt) sound.playerHurt('heavy')
+        else if (sound.crash) sound.crash()
+      }
+      if (typeof pulseGamepad === 'function') pulseGamepad(0.6, 0.8, 300)
       burst(game.player.x, game.player.y, '#06d6a0', 16, 90)
+      if (boss.rushDir) {
+        game.player.x = Math.max(24, Math.min(ARENA_WIDTH - 24, game.player.x + boss.rushDir.x * 55))
+        game.player.y = Math.max(24, Math.min(ARENA_HEIGHT - 24, game.player.y + boss.rushDir.y * 55))
+      }
       addLog(`【魔颅冲撞】三首融合骨皇蛮横冲撞，受到 ${Math.round(dmg)} 点巨额接触伤害！`, true)
       if (game.hp <= 0) {
         endRun()
@@ -6012,6 +6613,438 @@ function updateCorpseEmperor(boss, dt) {
       boss.state = 'idle'
     }
     return
+  }
+}
+
+/* ---------- 九天噬魂魔尊专属三阶段技能与机制 ---------- */
+
+function initAsuraDemon(boss, phaseIndex = 0) {
+  boss.r = 58
+  boss.laserState = 'idle'
+  boss.laserCooldown = phaseIndex >= 2 ? 3.5 : 12.0
+  boss.laserAngle = 0
+  boss.laserRotateDir = 1
+  boss.laserRotateSpeed = 0.42
+  boss.laserDuration = 6.0
+  boss.laserTelegraphTimer = 1.6
+  boss.laserMaxTelegraph = 1.6
+  boss.laserTimer = 0
+  boss.laserMaxTimer = 6.0
+  boss.blackholeTarget = null
+  if (boss.cooldowns) {
+    boss.cooldowns.barrage = 1.8
+    boss.cooldowns.aoe = phaseIndex >= 1 ? 3.0 : 99.0
+    boss.cooldowns.melee = 4.5
+  }
+}
+
+function updateAsuraDemon(boss, dt) {
+  const pIndex = boss.phaseIndex || 0
+
+  // 1. 三阶段六道全屏旋转激光系统 (独立计时与全屏旋转)
+  if (pIndex >= 2) {
+    updateAsuraHexLasers(boss, dt)
+  }
+
+  const isChannellingLaser = boss.laserState === 'moving_to_center' || boss.laserState === 'telegraph' || boss.laserState === 'firing'
+
+  // 2. 状态机驱动
+  if (boss.state === 'idle') {
+    if (!isChannellingLaser) {
+      boss.cooldowns.barrage = (boss.cooldowns.barrage != null ? boss.cooldowns.barrage : 3.2) - dt
+      boss.cooldowns.aoe = (boss.cooldowns.aoe != null ? boss.cooldowns.aoe : 4.5) - dt
+      boss.cooldowns.melee = (boss.cooldowns.melee != null ? boss.cooldowns.melee : 5.5) - dt
+
+      const dx = game.player.x - boss.x
+      const dy = game.player.y - boss.y
+      const dist = Math.hypot(dx, dy) || 1
+      boss.angle = Math.atan2(dy, dx)
+
+      // Boss 浮游巡弋保持中距
+      const idealDist = 220
+      let moveDirX = dx / dist
+      let moveDirY = dy / dist
+      if (dist < idealDist - 30) {
+        moveDirX = -moveDirX
+        moveDirY = -moveDirY
+      } else if (dist < idealDist + 40) {
+        const tangentX = -moveDirY
+        const tangentY = moveDirX
+        moveDirX = tangentX * 0.7
+        moveDirY = tangentY * 0.7
+      }
+
+      const curSpeed = boss.speed || 80
+      boss.x += moveDirX * curSpeed * dt
+      boss.y += moveDirY * curSpeed * dt
+      clampBossPosition(boss)
+
+      // 技能决策:
+      // 二阶段与三阶段：黑洞吸附
+      if (pIndex >= 1 && boss.cooldowns.aoe <= 0) {
+        startAsuraBlackhole(boss)
+        boss.cooldowns.aoe = (pIndex === 1 ? 5.2 : 6.0) + Math.random() * 1.5
+      }
+      // 所有阶段：噬魂追踪弹
+      else if (boss.cooldowns.barrage <= 0) {
+        startAsuraSoulBarrage(boss)
+        boss.cooldowns.barrage = (pIndex === 0 ? 3.6 : (pIndex === 1 ? 3.2 : 2.8)) + Math.random() * 1.0
+      }
+      // 近战修罗疾掠冲锋
+      else if (boss.cooldowns.melee <= 0 && dist < 360) {
+        boss.state = 'telegraph_rush'
+        boss.rushTarget = { x: game.player.x, y: game.player.y }
+        const rdx = game.player.x - boss.x
+        const rdy = game.player.y - boss.y
+        const rDist = Math.hypot(rdx, rdy) || 1
+        boss.rushDir = { x: rdx / rDist, y: rdy / rDist }
+        boss.telegraphTimer = boss.currentPhase.telegraphTime || 0.6
+        boss.maxTelegraph = boss.telegraphTimer
+        boss.rushDist = Math.min(380, rDist + 60)
+        boss.cooldowns.melee = 6.0 + Math.random() * 2.0
+      }
+    } else {
+      // 激光阶段：面向激光方向或玩家
+      if (boss.laserState === 'firing') {
+        boss.angle = boss.laserAngle
+      } else if (game.player) {
+        boss.angle = Math.atan2(game.player.y - boss.y, game.player.x - boss.x)
+      }
+    }
+  } else if (boss.state === 'telegraph_rush') {
+    boss.telegraphTimer -= dt
+    if (boss.telegraphTimer <= 0) {
+      boss.state = 'rushing'
+      boss.rushTimeRemaining = boss.currentPhase.rushDuration || 0.45
+      if (!isHeadless && typeof sound !== 'undefined') {
+        if (sound.enemySlam) sound.enemySlam('rush')
+        else if (sound.whoosh) sound.whoosh()
+      }
+    }
+  } else if (boss.state === 'rushing') {
+    boss.rushTimeRemaining -= dt
+    const rushV = boss.currentPhase.rushSpeed || 520
+    boss.x += boss.rushDir.x * rushV * dt
+    boss.y += boss.rushDir.y * rushV * dt
+    clampBossPosition(boss)
+
+    if (!isHeadless && Math.random() < 0.6) {
+      spawnBossGhostTrail(boss)
+    }
+
+    const dPlayer = Math.hypot(game.player.x - boss.x, game.player.y - boss.y)
+    if (dPlayer < boss.r + game.player.r && game.player.invuln <= 0) {
+      const dmgPct = 0.2
+      const dmg = Math.max(isHeadless ? 8 : 22, Math.round(game.maxHp * dmgPct))
+      game.hp -= dmg
+      game.player.invuln = 0.75
+      game.cameraShake = 0.4
+      if (typeof sound !== 'undefined') {
+        if (sound.playerHurt) sound.playerHurt('heavy')
+        else if (sound.crash) sound.crash()
+      }
+      if (typeof pulseGamepad === 'function') pulseGamepad(0.5, 0.7, 240)
+      burst(game.player.x, game.player.y, '#7209b7', 12, 60)
+      if (boss.rushDir) {
+        game.player.x = Math.max(24, Math.min(ARENA_WIDTH - 24, game.player.x + boss.rushDir.x * 45))
+        game.player.y = Math.max(24, Math.min(ARENA_HEIGHT - 24, game.player.y + boss.rushDir.y * 45))
+      }
+      addLog(`被九天噬魂魔尊狂暴冲锋扫中，受到 ${dmg} 点伤害！`, true)
+      if (game.hp <= 0) {
+        if (game.isTestLevel || game.testGodMode) {
+          game.hp = game.maxHp
+        } else {
+          endRun()
+          return
+        }
+      }
+    }
+
+    if (boss.rushTimeRemaining <= 0) {
+      boss.state = 'idle'
+    }
+  } else if (boss.state === 'casting_barrage') {
+    boss.castTimer -= dt
+    if (boss.castTimer <= 0) {
+      fireAsuraSoulBarrage(boss)
+      boss.state = 'idle'
+    }
+  } else if (boss.state === 'casting_blackhole') {
+    boss.castTimer -= dt
+    if (boss.castTimer <= 0) {
+      spawnAsuraBlackhole(boss)
+      boss.state = 'idle'
+    }
+  }
+}
+
+function updateAsuraHexLasers(boss, dt) {
+  const centerX = ARENA_WIDTH / 2
+  const centerY = ARENA_HEIGHT / 2
+
+  if (boss.laserState === 'idle') {
+    boss.laserCooldown = (boss.laserCooldown != null ? boss.laserCooldown : 11.0) - dt
+    if (boss.laserCooldown <= 0) {
+      const dCenter = Math.hypot(boss.x - centerX, boss.y - centerY)
+      if (dCenter > 15) {
+        boss.laserState = 'moving_to_center'
+        boss.state = 'idle'
+        if (!isHeadless) {
+          game.flash = 0.2
+          if (typeof sound !== 'undefined' && sound.whoosh) sound.whoosh()
+          addLog(`【魔尊归位】九天噬魂魔尊移至屏幕正中阵眼，六道灭世神光即将开阵！`, true)
+        }
+      } else {
+        boss.x = centerX
+        boss.y = centerY
+        boss.laserState = 'telegraph'
+        boss.laserTelegraphTimer = (boss.currentPhase && boss.currentPhase.laserTelegraph) || 1.6
+        boss.laserMaxTelegraph = boss.laserTelegraphTimer
+        boss.laserAngle = 0
+        boss.laserRotateDir = Math.random() < 0.5 ? 1 : -1
+        const dirText = boss.laserRotateDir > 0 ? '顺时针' : '逆时针'
+        if (!isHeadless) {
+          game.flash = 0.25
+          if (typeof sound !== 'undefined' && sound.magic) sound.magic()
+          addLog(`【六极崩灭】九天噬魂魔尊坐镇阵眼凝聚六道崩灭神光！即将【${dirText}】旋转，速速寻隙规避！`, true)
+        }
+      }
+    }
+  } else if (boss.laserState === 'moving_to_center') {
+    // 快速平滑飞向正中间 (ARENA_WIDTH / 2, ARENA_HEIGHT / 2)
+    const dx = centerX - boss.x
+    const dy = centerY - boss.y
+    const dist = Math.hypot(dx, dy)
+    if (dist > 10) {
+      const flySpeed = Math.max(300, dist * 2.8)
+      const step = Math.min(dist, flySpeed * dt)
+      boss.x += (dx / dist) * step
+      boss.y += (dy / dist) * step
+      if (!isHeadless && Math.random() < 0.4 && typeof spawnBossGhostTrail === 'function') {
+        spawnBossGhostTrail(boss)
+      }
+    } else {
+      boss.x = centerX
+      boss.y = centerY
+      boss.laserState = 'telegraph'
+      boss.laserTelegraphTimer = (boss.currentPhase && boss.currentPhase.laserTelegraph) || 1.6
+      boss.laserMaxTelegraph = boss.laserTelegraphTimer
+      boss.laserAngle = 0
+      boss.laserRotateDir = Math.random() < 0.5 ? 1 : -1
+      const dirText = boss.laserRotateDir > 0 ? '顺时针' : '逆时针'
+      if (!isHeadless) {
+        game.flash = 0.25
+        if (typeof sound !== 'undefined' && sound.magic) sound.magic()
+        addLog(`【六极崩灭】九天噬魂魔尊已归位正中！六道神光即将【${dirText}】开阵，速速就位！`, true)
+      }
+    }
+  } else if (boss.laserState === 'telegraph') {
+    // 强制固定在正中心，杜绝偏心
+    boss.x = centerX
+    boss.y = centerY
+    boss.laserTelegraphTimer -= dt
+    if (boss.laserTelegraphTimer <= 0) {
+      boss.laserState = 'firing'
+      boss.laserTimer = (boss.currentPhase && boss.currentPhase.laserDuration) || 6.0
+      boss.laserMaxTimer = boss.laserTimer
+      if (!boss.laserRotateDir) {
+        boss.laserRotateDir = Math.random() < 0.5 ? 1 : -1
+      }
+      const dirText = boss.laserRotateDir > 0 ? '顺时针' : '逆时针'
+      if (!isHeadless) {
+        game.cameraShake = 0.45
+        if (typeof sound !== 'undefined') {
+          if (sound.enemyAoE) sound.enemyAoE('laser')
+          else {
+            if (sound.dragon) sound.dragon()
+            if (sound.whirlwind) sound.whirlwind()
+          }
+        }
+        addLog(`【全屏激射】六道全屏极光以阵眼为中心开启【${dirText}】旋转！请跟随光束缝隙走位！`, true)
+      }
+    }
+  } else if (boss.laserState === 'firing') {
+    // 持续固定在正中心
+    boss.x = centerX
+    boss.y = centerY
+    boss.laserTimer -= dt
+    const rotSpeed = (boss.currentPhase && boss.currentPhase.laserRotateSpeed) || 0.42
+    boss.laserAngle += rotSpeed * (boss.laserRotateDir || 1) * dt
+
+    // 激光射线碰撞判定
+    checkHexLaserCollision(boss)
+
+    if (boss.laserTimer <= 0) {
+      boss.laserState = 'idle'
+      boss.laserCooldown = ((boss.currentPhase && boss.currentPhase.laserCooldown) || 12.0) + Math.random() * 2.0
+    }
+  }
+}
+
+function checkHexLaserCollision(boss) {
+  if (!game.player || game.player.invuln > 0) return
+  if (game.testGodMode) return
+
+  const bx = boss.x
+  const by = boss.y
+  const px = game.player.x
+  const py = game.player.y
+  const dx = px - bx
+  const dy = py - by
+  const distToBoss = Math.hypot(dx, dy)
+  if (distToBoss < 12) return
+
+  const beamCount = 6
+  const beamAngleStep = (Math.PI * 2) / beamCount
+  const beamRadius = 14
+  const hitThreshold = beamRadius + (game.player.r || 14)
+
+  for (let i = 0; i < beamCount; i++) {
+    const angle = boss.laserAngle + i * beamAngleStep
+    const ux = Math.cos(angle)
+    const uy = Math.sin(angle)
+
+    const proj = dx * ux + dy * uy
+    if (proj > 0 && proj < 1400) {
+      const perpDist = Math.abs(dx * uy - dy * ux)
+      if (perpDist < hitThreshold) {
+        const dmgPct = 0.25
+        const dmg = Math.max(isHeadless ? 10 : 25, Math.round(game.maxHp * dmgPct))
+        game.hp -= dmg
+        game.player.invuln = 0.65
+        game.cameraShake = 0.35
+        burst(game.player.x, game.player.y, '#f72585', 14, 70)
+        burst(game.player.x, game.player.y, '#06d6a0', 10, 45)
+        if (typeof sound !== 'undefined') {
+          if (sound.playerHurt) sound.playerHurt('bullet')
+          else if (sound.hit) sound.hit()
+        }
+        if (typeof pulseGamepad === 'function') pulseGamepad(0.45, 0.6, 200)
+        addLog(`【崩灭神光】被六极崩灭旋转激光扫中！受到 ${dmg} 点神光伤害！`, true)
+        if (game.hp <= 0) {
+          if (game.isTestLevel || game.testGodMode) {
+            game.hp = game.maxHp
+          } else {
+            endRun()
+            return
+          }
+        }
+        break
+      }
+    }
+  }
+}
+
+function startAsuraSoulBarrage(boss) {
+  boss.state = 'casting_barrage'
+  boss.castTimer = 0.42
+}
+
+function fireAsuraSoulBarrage(boss) {
+  if (!game.bossProjectiles) game.bossProjectiles = []
+  const count = (boss.currentPhase && boss.currentPhase.barrageCount) || (boss.phaseIndex === 0 ? 10 : (boss.phaseIndex === 1 ? 12 : 16))
+  const baseAngle = Math.atan2(game.player.y - boss.y, game.player.x - boss.x)
+  const spread = Math.min(1.3, 0.18 * count)
+
+  for (let i = 0; i < count; i++) {
+    const angle = baseAngle + (i - (count - 1) / 2) * (spread / count)
+    const spd = 160 + (i % 3) * 15
+    game.bossProjectiles.push({
+      x: boss.x + Math.cos(angle) * (boss.r + 14),
+      y: boss.y + Math.sin(angle) * (boss.r + 14),
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd,
+      r: 9,
+      damage: boss.damage * 0.7,
+      color: '#06d6a0',
+      glowColor: '#7209b7',
+      life: 3.6,
+      maxLife: 3.6,
+      homing: true,
+      type: 'asura_soul',
+      spin: Math.random() * Math.PI * 2
+    })
+  }
+
+  burst(boss.x, boss.y, '#06d6a0', 14, 70)
+  burst(boss.x, boss.y, '#7209b7', 10, 50)
+  if (!isHeadless) {
+    if (typeof sound !== 'undefined') {
+      if (sound.enemyShoot) sound.enemyShoot('asura_soul')
+      else if (sound.shoot) sound.shoot()
+    }
+    addLog(`【天魔噬魂】九天噬魂魔尊释放 ${count} 枚噬魂魔魂，呼啸追踪而来！`, true)
+  }
+}
+
+function startAsuraBlackhole(boss) {
+  boss.state = 'casting_blackhole'
+  boss.castTimer = 0.6
+  boss.maxCastTimer = 0.6
+  boss.blackholeTarget = {
+    x: game.player ? game.player.x : ARENA_WIDTH / 2,
+    y: game.player ? game.player.y : ARENA_HEIGHT / 2
+  }
+  if (!isHeadless) {
+    if (typeof sound !== 'undefined') {
+      if (sound.enemyAoE) sound.enemyAoE('blackhole_cast')
+      else if (sound.whirlwind) sound.whirlwind()
+    }
+    addLog('【黑洞聚能】虚空引力正在急剧汇聚！地面预警已锁定，速速逃离法阵！', true)
+  }
+}
+
+function spawnAsuraBlackhole(boss) {
+  if (!game.bossAoEs) game.bossAoEs = []
+  const count = (boss.currentPhase && boss.currentPhase.aoeCount) || 1
+  const targetX = boss.blackholeTarget ? boss.blackholeTarget.x : (game.player ? game.player.x : ARENA_WIDTH / 2)
+  const targetY = boss.blackholeTarget ? boss.blackholeTarget.y : (game.player ? game.player.y : ARENA_HEIGHT / 2)
+  boss.blackholeTarget = null
+
+  for (let i = 0; i < count; i++) {
+    let tx = targetX
+    let ty = targetY
+    if (i > 0) {
+      const angle = Math.random() * Math.PI * 2
+      const dist = 140 + Math.random() * 80
+      tx = Math.max(90, Math.min(ARENA_WIDTH - 90, targetX + Math.cos(angle) * dist))
+      ty = Math.max(90, Math.min(ARENA_HEIGHT - 90, targetY + Math.sin(angle) * dist))
+    }
+
+    // 防止与场上已有黑洞过度重叠
+    for (const existing of game.bossAoEs) {
+      if (existing.type === 'asura_blackhole' && !existing.exploded) {
+        const d = Math.hypot(tx - existing.x, ty - existing.y)
+        if (d < 120) {
+          const pushAngle = Math.atan2(ty - existing.y, tx - existing.x) || (Math.PI / 4)
+          tx = Math.max(90, Math.min(ARENA_WIDTH - 90, existing.x + Math.cos(pushAngle) * 130))
+          ty = Math.max(90, Math.min(ARENA_HEIGHT - 90, existing.y + Math.sin(pushAngle) * 130))
+        }
+      }
+    }
+
+    game.bossAoEs.push({
+      type: 'asura_blackhole',
+      bossId: 'asura_demon',
+      x: tx,
+      y: ty,
+      r: (boss.currentPhase && boss.currentPhase.aoeRadius) || 105,
+      suctionRadius: 175,
+      timer: 3.8,
+      maxTimer: 3.8,
+      tickTimer: 0,
+      damage: boss.damage * 1.8,
+      color: '#7209b7',
+      secondaryColor: '#f72585',
+      exploded: false,
+      spin: 0
+    })
+  }
+
+  burst(boss.x, boss.y, '#7209b7', 18, 80)
+  if (!isHeadless) {
+    if (typeof sound !== 'undefined' && sound.magic) sound.magic()
+    addLog('【黑洞吸附】噬魂黑洞撕裂空间展开！强引力减速吸附，未能及时逃离者将受毁灭引爆！', true)
   }
 }
 
@@ -6088,6 +7121,15 @@ function spawnBoss(config) {
       totalFrames: 8,
       fps: 9,
       loop: true
+    }) : (config.id === 'asura_demon' && typeof SpriteSheetAnimation !== 'undefined' && bossAsuraDemonSheetImg) ? new SpriteSheetAnimation({
+      img: bossAsuraDemonSheetImg,
+      frameW: 180,
+      frameH: 180,
+      cols: 4,
+      rows: 2,
+      totalFrames: 8,
+      fps: 8.5,
+      loop: true
     }) : null,
     arms: [],
     isBerserk: false
@@ -6128,6 +7170,11 @@ function spawnBoss(config) {
   // 专属初始化：幽冥白骨尸皇骨臂
   if (config.id === 'corpse_emperor') {
     initCorpseEmperorArms(boss, 0)
+  }
+
+  // 专属初始化：九天噬魂魔尊
+  if (config.id === 'asura_demon') {
+    initAsuraDemon(boss, 0)
   }
 
   // 更新 HUD
@@ -6206,8 +7253,10 @@ function updateBoss(dt) {
   // 领主序列帧动画平滑更新与状态自适应调速
   if (boss.sheetAnim) {
     const isEnraged = boss.phaseIndex >= 1
-    const isAction = boss.state === 'rushing' || boss.state === 'casting_barrage' || boss.state === 'casting_aoe'
-    boss.sheetAnim.fps = isAction ? 14 : (isEnraged ? 11 : 8.5)
+    const isAction = boss.state === 'rushing' || boss.state === 'telegraph_rush' ||
+      boss.state === 'casting_barrage' || boss.state === 'casting_aoe' || boss.state === 'casting_blackhole' ||
+      boss.laserState === 'telegraph' || boss.laserState === 'firing' || boss.laserState === 'moving_to_center'
+    boss.sheetAnim.fps = isAction ? 13.5 : (isEnraged ? 10.5 : 8.5)
     boss.sheetAnim.update(dt)
   }
 
@@ -6264,6 +7313,12 @@ function updateBoss(dt) {
   // 幽冥白骨尸皇专属多部位与攻击逻辑
   if (boss.id === 'corpse_emperor') {
     updateCorpseEmperor(boss, dt)
+    return
+  }
+
+  // 九天噬魂魔尊专属三阶段技能与激光黑洞逻辑
+  if (boss.id === 'asura_demon') {
+    updateAsuraDemon(boss, dt)
     return
   }
 
@@ -6336,7 +7391,10 @@ function updateBoss(dt) {
     if (boss.telegraphTimer <= 0) {
       boss.state = 'rushing'
       boss.rushTimeRemaining = boss.currentPhase.rushDuration || 0.42
-      if (typeof sound !== 'undefined') sound.whirlwind()
+      if (!isHeadless && typeof sound !== 'undefined') {
+        if (sound.enemySlam) sound.enemySlam('rush')
+        else if (sound.whirlwind) sound.whirlwind()
+      }
     }
     return
   }
@@ -6370,7 +7428,10 @@ function updateBoss(dt) {
       game.hp -= dmg
       game.player.invuln = 0.8
       game.cameraShake = 0.35
-      if (typeof sound !== 'undefined') sound.crash()
+      if (typeof sound !== 'undefined') {
+        if (sound.playerHurt) sound.playerHurt('heavy')
+        else if (sound.crash) sound.crash()
+      }
       if (typeof pulseGamepad === 'function') pulseGamepad(0.5, 0.7, 250)
       burst(game.player.x, game.player.y, '#e63946', 12, 80)
       // 强击退玩家
@@ -6507,6 +7568,7 @@ function executeBarrageAttack(boss) {
         spin: (i * 0.7)
       })
     }
+    if (!isHeadless && typeof sound !== 'undefined' && sound.enemyShoot) sound.enemyShoot('fireball')
   } else if (boss.id === 'corpse_emperor') {
     // 幽冥骨刺：双环旋转齐射
     for (let i = 0; i < count; i++) {
@@ -6525,26 +7587,10 @@ function executeBarrageAttack(boss) {
         type: 'bonespike'
       })
     }
+    if (!isHeadless && typeof sound !== 'undefined' && sound.enemyShoot) sound.enemyShoot('bonespike')
   } else if (boss.id === 'asura_demon') {
-    // 天魔噬魂弹：微追踪幽冥骷髅
-    for (let i = 0; i < count; i++) {
-      const offset = (i - count / 2) * 0.22
-      const angle = baseAngle + offset
-      game.bossProjectiles.push({
-        x: boss.x,
-        y: boss.y,
-        vx: Math.cos(angle) * 200,
-        vy: Math.sin(angle) * 200,
-        r: 8,
-        damage: boss.damage * 0.7,
-        color: '#7209b7',
-        glowColor: '#f72585',
-        life: 2.6,
-        maxLife: 2.6,
-        homing: true,
-        type: 'voidorb'
-      })
-    }
+    fireAsuraSoulBarrage(boss)
+    return
   } else if (boss.id === 'celestial_peng') {
     // 巡天金翅大鹏：极速太乙金羽剑雨
     const spread = Math.PI * 0.5
@@ -6564,6 +7610,7 @@ function executeBarrageAttack(boss) {
         type: 'feather'
       })
     }
+    if (!isHeadless && typeof sound !== 'undefined' && sound.enemyShoot) sound.enemyShoot('feather')
   } else if (boss.id === 'primordial_god') {
     // 混沌太虚道祖：旋转阴阳混沌星辰弹与太虚诛仙剑雨
     for (let i = 0; i < count; i++) {
@@ -6583,6 +7630,7 @@ function executeBarrageAttack(boss) {
         type: isBlade ? 'cosmic_blade' : 'yin_yang_orb'
       })
     }
+    if (!isHeadless && typeof sound !== 'undefined' && sound.enemyShoot) sound.enemyShoot('cosmic_blade')
   }
 }
 
@@ -6592,6 +7640,10 @@ function startCastAoE(boss) {
 }
 
 function executeAoEAttack(boss) {
+  if (boss.id === 'asura_demon') {
+    spawnAsuraBlackhole(boss)
+    return
+  }
   const count = boss.currentPhase.aoeCount || 3
   const aoeRadius = boss.currentPhase.aoeRadius || 52
 
@@ -6683,7 +7735,10 @@ function fireMagmaBarrage(enemy) {
   burst(enemy.x, enemy.y, '#ffbe0b', 14, 65)
   burst(enemy.x, enemy.y, '#d62828', 10, 50)
   if (!isHeadless) {
-    if (typeof sound !== 'undefined' && sound.shoot) sound.shoot()
+    if (typeof sound !== 'undefined') {
+      if (sound.enemyShoot) sound.enemyShoot('magma')
+      else if (sound.shoot) sound.shoot()
+    }
     game.cameraShake = Math.max(game.cameraShake || 0, 0.16)
   }
 }
@@ -6718,7 +7773,10 @@ function fireFrostCrystalBarrage(enemy) {
   burst(enemy.x, enemy.y, '#38bdf8', 16, 75)
   burst(enemy.x, enemy.y, '#ffffff', 12, 60)
   if (!isHeadless) {
-    if (typeof sound !== 'undefined' && sound.shoot) sound.shoot()
+    if (typeof sound !== 'undefined') {
+      if (sound.enemyShoot) sound.enemyShoot('frost_crystal')
+      else if (sound.shoot) sound.shoot()
+    }
     game.cameraShake = Math.max(game.cameraShake || 0, 0.14)
   }
 }
@@ -6729,23 +7787,37 @@ function updateBossProjectiles(dt) {
   if (!game.bossProjectiles || !game.bossProjectiles.length) return
 
   for (const proj of [...game.bossProjectiles]) {
-    // 追踪弹修正航向
+    // 追踪弹修正航向：以玩家躯干中心 (y - 8) 为目标，避免一直朝着脚底地面追
     if (proj.homing && game.player) {
-      const targetAngle = Math.atan2(game.player.y - proj.y, game.player.x - proj.x)
+      const targetAngle = Math.atan2((game.player.y - 8) - proj.y, game.player.x - proj.x)
       const curAngle = Math.atan2(proj.vy, proj.vx)
       let diff = targetAngle - curAngle
       while (diff < -Math.PI) diff += Math.PI * 2
       while (diff > Math.PI) diff -= Math.PI * 2
-      const turnSpeed = 2.4 * dt
+      const turnSpeed = (proj.type === 'asura_soul' ? 1.85 : 2.4) * dt
       const newAngle = curAngle + Math.max(-turnSpeed, Math.min(turnSpeed, diff))
       const spd = Math.hypot(proj.vx, proj.vy)
       proj.vx = Math.cos(newAngle) * spd
       proj.vy = Math.sin(newAngle) * spd
     }
 
+    const prevX = proj.x
+    const prevY = proj.y
     proj.x += proj.vx * dt
     proj.y += proj.vy * dt
     proj.life -= dt
+
+    // 噬魂幽灵青焰微煞粒子拖尾
+    if (proj.type === 'asura_soul' && !isHeadless && Math.random() < 0.45 && game.particles && game.particles.length < 90) {
+      game.particles.push({
+        x: proj.x + (Math.random() - 0.5) * 6,
+        y: proj.y + (Math.random() - 0.5) * 6,
+        vx: -proj.vx * 0.12 + (Math.random() - 0.5) * 15,
+        vy: -proj.vy * 0.12 + (Math.random() - 0.5) * 15,
+        life: 0.22,
+        color: Math.random() < 0.6 ? '#06d6a0' : '#7209b7'
+      })
+    }
 
     // 赤炼火弹飞行动态微火星拖尾 (轻量零GC，数量受控)
     if (proj.type === 'fireball' && !isHeadless && Math.random() < 0.35 && game.particles && game.particles.length < 90) {
@@ -6793,11 +7865,28 @@ function updateBossProjectiles(dt) {
       })
     }
 
+    if (!game.player) continue
+
+    // 高精度连续扫掠碰撞检测 (CCD + 玩家躯干垂直胶囊体)
+    // 杜绝大鹏 310px/s 等高速弹幕在掉帧时穿模跳过，且彻底覆盖脚底至胸口、头部的全身体型
+    const px = game.player.x
+    const py = game.player.y
+    const segDx = proj.x - prevX
+    const segDy = proj.y - prevY
+    const segLenSq = segDx * segDx + segDy * segDy
+    let t = 0
+    if (segLenSq > 0.0001) {
+      t = Math.max(0, Math.min(1, ((px - prevX) * segDx + ((py - 8) - prevY) * segDy) / segLenSq))
+    }
+    const sampleX = prevX + segDx * t
+    const sampleY = prevY + segDy * t
+    const closestPlayerY = Math.max(py - 16, Math.min(py, sampleY))
+    const dPlayer = Math.hypot(px - sampleX, closestPlayerY - sampleY)
+
     // 幽冥鬼火贴身引爆与地脉火沼生成 (接近玩家时爆炸造成持续范围伤害)
     if (proj.type === 'corpse_ghost_fire' || proj.type === 'corpse_giant_ghost_fire') {
       const isGiant = proj.type === 'corpse_giant_ghost_fire'
       const triggerDist = isGiant ? 48 : 36
-      const dPlayer = Math.hypot(game.player.x - proj.x, game.player.y - proj.y)
       if (dPlayer < triggerDist || proj.life <= dt) {
         proj.life = 0
         burst(proj.x, proj.y, '#06d6a0', isGiant ? 22 : 14, isGiant ? 90 : 60)
@@ -6812,7 +7901,7 @@ function updateBossProjectiles(dt) {
           telegraphTimer: 0,
           activeTimer: isGiant ? 3.8 : 3.2,
           maxActive: isGiant ? 3.8 : 3.2,
-          tickTimer: 0,
+          tickTimer: 0.15,
           isHazardPool: true,
           hazardType: 'corpse_ghost_fire',
           damage: isGiant ? 12 : 8,
@@ -6822,63 +7911,129 @@ function updateBossProjectiles(dt) {
         })
 
         // 爆炸直接伤害判定
-        if (dPlayer < (isGiant ? 55 : 42) + game.player.r && game.player.invuln <= 0) {
-          const dmgPct = isGiant ? 0.18 : 0.12
-          const dmg = Math.max(isHeadless ? 6 : (isGiant ? 18 : 12), Math.round(game.maxHp * dmgPct))
-          game.hp -= dmg
-          game.player.invuln = 0.65
-          game.cameraShake = isGiant ? 0.35 : 0.2
-          burst(game.player.x, game.player.y, '#06d6a0', 10, 50)
-          addLog(`【鬼火轰爆】被幽冥鬼火贴身引爆，受到 ${Math.round(dmg)} 点范围伤害！`, true)
+        if (dPlayer < (isGiant ? 55 : 42) + game.player.r) {
+          if (game.player.invuln <= 0 && !game.testGodMode) {
+            const dmgPct = isGiant ? 0.18 : 0.12
+            const dmg = Math.max(isHeadless ? 6 : (isGiant ? 18 : 12), Math.round(game.maxHp * dmgPct))
+            game.hp -= dmg
+            game.player.invuln = 0.35
+            game.cameraShake = isGiant ? 0.35 : 0.2
+            burst(game.player.x, game.player.y - 8, '#06d6a0', 10, 50)
+            if (typeof sound !== 'undefined') {
+              if (sound.playerHurt) sound.playerHurt('explosion')
+              else if (sound.hit) sound.hit()
+            }
+            if (typeof pulseGamepad === 'function') pulseGamepad(0.4, 0.6, 200)
+            addLog(`【鬼火轰爆】被幽冥鬼火贴身引爆，受到 ${Math.round(dmg)} 点范围伤害！`, true)
+          } else {
+            burst(game.player.x, game.player.y - 8, '#ffd166', 6, 30)
+          }
         }
         continue
       }
     }
 
     // 碰撞玩家
-    const dPlayer = Math.hypot(game.player.x - proj.x, game.player.y - proj.y)
-    if (dPlayer < proj.r + game.player.r && game.player.invuln <= 0) {
+    if (dPlayer < proj.r + game.player.r) {
+      proj.life = 0 // 弹幕触碰玩家必定销毁，绝不幽灵穿身
+
       if (game.testGodMode) {
-        proj.life = 0
+        burst(proj.x, proj.y, '#ffd166', 6, 35)
         continue
       }
+
       const boss = game.boss
       const isEnraged = boss && boss.phaseIndex >= 1
       const isEliteBrute = proj.source === 'elite_brute'
       const isEliteFrost = proj.source === 'elite_frost_brute' || proj.type === 'frost_crystal'
       const isElite = isEliteBrute || isEliteFrost
-      // 火系直接伤害调整为 6%（后续带 6% 持续灼烧），冰系直接伤害为 7%（后续带 45% 减速或冰冻）
-      const projPct = isElite ? (isEliteFrost ? 0.07 : 0.06) : (0.08 + (isEnraged ? 0.03 : 0))
-      const dmg = Math.max(isHeadless ? 4 : Math.round(proj.damage || (isElite ? 10 : 8)), Math.round(game.maxHp * projPct))
+
+      // 玩家若处于无敌帧期间受创：触发散弹散射/护盾吸收机制
+      if (game.player.invuln > 0) {
+        if ((game.playerProjectileGrace || 0) <= 0) {
+          game.playerProjectileGrace = 0.12 // 0.12s 的短促散弹吸收保护
+          const scatterPct = isElite ? 0.025 : (0.03 + (isEnraged ? 0.015 : 0))
+          const scatterDmg = Math.max(isHeadless ? 2 : 4, Math.round(game.maxHp * scatterPct))
+          game.hp -= scatterDmg
+          burst(proj.x, proj.y, '#ffd166', 6, 35)
+          burst(game.player.x, game.player.y - 8, proj.glowColor || '#ffbe0b', 5, 25)
+          if (typeof sound !== 'undefined') {
+            if (sound.playerHurt) sound.playerHurt('bullet')
+            else if (sound.hit) sound.hit()
+          }
+          addLog(`【护体震荡】护体金光抵消大部分威能，承受 ${scatterDmg} 点穿透震荡伤害！`)
+
+          // 冰棱晶散射命中也能顺利触发【绝对冰结】！
+          if (isEliteFrost && (game.playerChillTimer || 0) > 0) {
+            game.playerFreezeTimer = 0.9
+            game.playerChillTimer = 2.2
+            addLog(`【绝对冰结】极寒冰棱侵骨，行动被坚冰冻结！`, true)
+            burst(game.player.x, game.player.y - 8, '#bae6fd', 16, 80)
+          }
+        } else {
+          // 极短促吸收期间被彻底消解化开
+          burst(proj.x, proj.y, '#ffffff', 5, 20)
+        }
+        continue
+      }
+
+      // 正常非无敌期首次命中：统一各专属弹幕类型全额伤害计算
+      let projPct = isElite ? (isEliteFrost ? 0.07 : 0.06) : (0.08 + (isEnraged ? 0.03 : 0))
+      let baseDmgVal = isElite ? (isEliteFrost ? 10 : 12) : 8
+      if (proj.type === 'asura_soul') {
+        projPct = 0.09 + (isEnraged ? 0.03 : 0)
+        baseDmgVal = 14
+      }
+      const dmg = Math.max(isHeadless ? 4 : Math.round(proj.damage || baseDmgVal), Math.round(game.maxHp * projPct))
+
       game.hp -= dmg
-      game.player.invuln = 0.65
-      proj.life = 0
-      burst(proj.x, proj.y, proj.glowColor || '#38bdf8', 6, 40)
-      if (typeof sound !== 'undefined') sound.hit()
-      if (typeof pulseGamepad === 'function') pulseGamepad(0.35, 0.5, 150)
+      game.player.invuln = 0.28 // 投射物无敌帧设定为精干的 0.28s，兼顾保护与弹幕反馈
+      game.playerProjectileGrace = 0.12
+      burst(proj.x, proj.y, proj.glowColor || '#38bdf8', 8, 45)
+
+      let hurtType = 'bullet'
+      if (proj.type === 'frost_crystal') hurtType = 'frost'
+      else if (proj.type === 'fireball') hurtType = 'fire'
+      else if (proj.type === 'corpse_ghost_fire' || proj.type === 'corpse_giant_ghost_fire') hurtType = 'explosion'
+
+      if (typeof sound !== 'undefined') {
+        if (sound.playerHurt) sound.playerHurt(hurtType)
+        else if (sound.hit) sound.hit()
+      }
+      if (typeof pulseGamepad === 'function') pulseGamepad(0.25, 0.4, 120)
+
+      // 弹道微后仰 (6px)，增加受击动感
+      if (!isHeadless || globalThis.__FORCE_VISUAL_FX__) {
+        const pSpd = Math.hypot(proj.vx, proj.vy) || 1
+        game.player.x = Math.max(24, Math.min(ARENA_WIDTH - 24, game.player.x + (proj.vx / pSpd) * 6))
+        game.player.y = Math.max(24, Math.min(ARENA_HEIGHT - 24, game.player.y + (proj.vy / pSpd) * 6))
+      }
+
       if (isEliteFrost) {
         if ((game.playerChillTimer || 0) > 0) {
-          // 减速期间再次受创 -> 触发 0.9 秒绝对冰冻！
           game.playerFreezeTimer = 0.9
           game.playerChillTimer = 2.2
           addLog(`【绝对冰结】极寒冰棱侵骨，行动被坚冰冻结！受到 ${Math.round(dmg)} 点伤害！`, true)
-          burst(game.player.x, game.player.y, '#bae6fd', 16, 80)
+          burst(game.player.x, game.player.y - 8, '#bae6fd', 16, 80)
         } else {
-          // 初次中弹 -> 移速迟滞 45%，持续 2.2 秒
           game.playerChillTimer = 2.2
           game.playerChillSlow = 0.45
           addLog(`【玄霜减速】极寒之气透体，移速迟滞 45%！受到 ${Math.round(dmg)} 点伤害！`, true)
-          burst(game.player.x, game.player.y, '#38bdf8', 12, 50)
+          burst(game.player.x, game.player.y - 8, '#38bdf8', 12, 50)
         }
       } else if (isEliteBrute) {
-        // 火系：直接伤害 + 施加持续 2.4 秒地火灼烧 (共 5 跳，每跳 1.2% 最大生命)
         game.playerBurnTimer = 2.4
         game.playerBurnTick = 0.48
         game.playerBurnDmg = Math.max(1, Math.round(game.maxHp * 0.012))
         addLog(`【地火灼烧】被赤炼熔岩弹命中！受到 ${Math.round(dmg)} 点伤害并陷入持续灼烧！`, true)
+      } else if (proj.type === 'asura_soul') {
+        burst(proj.x, proj.y, '#06d6a0', 12, 50)
+        burst(proj.x, proj.y, '#7209b7', 8, 35)
+        addLog(`【噬魂蚀骨】被九天噬魂魔尊的怨念魔魂击中，受到 ${Math.round(dmg)} 点伤害！`, true)
       } else {
         addLog(`被领主弹幕命中，受到 ${Math.round(dmg)} 点伤害（约 ${Math.round(projPct * 100)}% 生命）！`)
       }
+
       if (game.hp <= 0) {
         if (game.isTestLevel || game.testGodMode) {
           game.hp = game.maxHp
@@ -6896,17 +8051,109 @@ function updateBossAoEs(dt) {
   if (!game.bossAoEs || !game.bossAoEs.length) return
 
   for (const aoe of [...game.bossAoEs]) {
+    if (aoe.type === 'asura_blackhole') {
+      aoe.timer -= dt
+      aoe.spin = (aoe.spin || 0) + dt * 2.8
+
+      // 玩家躯干胶囊体距离计算
+      const dPlayer = Math.hypot(game.player.x - aoe.x, Math.max(game.player.y - 16, Math.min(game.player.y, aoe.y)) - aoe.y)
+
+      if (aoe.timer > 0) {
+        // 1. 引力吸附与减速 (处于吸附半径内)
+        if (dPlayer < aoe.suctionRadius) {
+          // 向心牵引力：上限 75 px/s，边缘 25 px/s，确保玩家按逃离键净速度 > 0 必定能够顺利逃脱
+          const pullStrength = Math.min(75, (1 - dPlayer / aoe.suctionRadius) * 50 + 25)
+          const pullAngle = Math.atan2(aoe.y - game.player.y, aoe.x - game.player.x)
+          game.player.x += Math.cos(pullAngle) * pullStrength * dt
+          game.player.y += Math.sin(pullAngle) * pullStrength * dt
+          game.player.x = Math.max(24, Math.min(ARENA_WIDTH - 24, game.player.x))
+          game.player.y = Math.max(24, Math.min(ARENA_HEIGHT - 24, game.player.y))
+
+          // 移速减速 30% (保持 70% 移动能力)
+          game.playerBlackholeSlowTimer = 0.25
+
+          // 2. 持续撕扯伤害 (每 0.45s 受到腐蚀伤害)
+          aoe.tickTimer = (aoe.tickTimer || 0) + dt
+          if (aoe.tickTimer >= 0.45) {
+            aoe.tickTimer = 0
+            if (game.player.invuln <= 0) {
+              const dmg = Math.max(2, Math.round(game.maxHp * 0.025))
+              game.hp -= dmg
+              game.player.invuln = 0.2
+              if (typeof sound !== 'undefined' && sound.playerHurt) sound.playerHurt('dot')
+              burst(game.player.x, game.player.y - 8, '#7209b7', 5, 30)
+              addLog(`【虚空撕扯】深陷噬魂黑洞撕扯，受到 ${dmg} 点持续腐蚀伤害！`)
+              if (game.hp <= 0) {
+                if (game.isTestLevel || game.testGodMode) {
+                  game.hp = game.maxHp
+                } else {
+                  endRun()
+                  return
+                }
+              }
+            }
+          }
+        }
+      } else if (!aoe.exploded) {
+        // 3. 超时终极爆炸！
+        aoe.exploded = true
+        burst(aoe.x, aoe.y, '#7209b7', 30, 140)
+        burst(aoe.x, aoe.y, '#f72585', 22, 110)
+        burst(aoe.x, aoe.y, '#06d6a0', 16, 80)
+        if (!isHeadless) {
+          game.cameraShake = 0.5
+          game.flash = 0.4
+          if (typeof sound !== 'undefined') {
+            if (sound.enemyAoE) sound.enemyAoE('blackhole_detonate')
+            else {
+              if (sound.crash) sound.crash()
+              if (sound.slam) sound.slam()
+            }
+          }
+        }
+
+        // 判定玩家是否仍停留在爆炸危险核心内 (绝不被自身微小的持续撕扯 tick 附带的无敌帧吞掉伤害！)
+        const inCore = dPlayer < aoe.r + game.player.r
+        if (inCore) {
+          if (!game.testGodMode) {
+            const dmgPct = 0.38
+            const dmg = Math.max(isHeadless ? 20 : 36, Math.round(game.maxHp * dmgPct))
+            game.hp -= dmg
+            game.player.invuln = 0.8
+            burst(game.player.x, game.player.y - 8, '#f72585', 18, 80)
+            if (typeof sound !== 'undefined' && sound.playerHurt) sound.playerHurt('explosion')
+            if (typeof pulseGamepad === 'function') pulseGamepad(0.6, 0.8, 300)
+            addLog(`【黑洞殉爆】未能及时逃离噬魂黑洞！承受终极黑洞引爆 ${dmg} 点毁灭伤害！`, true)
+            if (game.hp <= 0) {
+              if (game.isTestLevel || game.testGodMode) {
+                game.hp = game.maxHp
+              } else {
+                endRun()
+                return
+              }
+            }
+          } else {
+            addLog(`【金刚不坏】护体神光抵御了黑洞终极引爆！`)
+          }
+        } else {
+          addLog(`【劫后余生】成功及时逃离噬魂黑洞爆炸范围！`, false)
+        }
+      }
+      continue
+    }
+
     if (aoe.isHazardPool) {
       aoe.activeTimer -= dt
       aoe.tickTimer = (aoe.tickTimer || 0) + dt
       if (aoe.tickTimer >= 0.35) {
         aoe.tickTimer = 0
-        const dPlayer = Math.hypot(game.player.x - aoe.x, game.player.y - aoe.y)
-        if (dPlayer < aoe.r + game.player.r && game.player.invuln <= 0) {
+        const dPlayer = Math.hypot(game.player.x - aoe.x, Math.max(game.player.y - 16, Math.min(game.player.y, aoe.y)) - aoe.y)
+        if (dPlayer < aoe.r + game.player.r && (game.player.invuln <= 0 || game.player.invuln <= 0.25) && !game.testGodMode) {
           const dmg = Math.max(2, Math.round(game.maxHp * 0.025))
           game.hp -= dmg
-          game.player.invuln = 0.25
-          burst(game.player.x, game.player.y, '#06d6a0', 5, 35)
+          game.player.invuln = 0.22
+          if (typeof sound !== 'undefined' && sound.playerHurt) sound.playerHurt('dot')
+          burst(game.player.x, game.player.y - 8, '#06d6a0', 5, 35)
           addLog(`【鬼火灼魂】陷入幽冥地火毒沼，受到 ${dmg} 点持续煞气伤害！`)
           if (game.hp <= 0) {
             endRun()
@@ -6919,35 +8166,60 @@ function updateBossAoEs(dt) {
 
     if (aoe.telegraphTimer > 0) {
       aoe.telegraphTimer -= dt
-    } else if (aoe.activeTimer > 0) {
+    }
+    if (aoe.telegraphTimer <= 0 && aoe.activeTimer > 0) {
       if (!aoe.exploded) {
         aoe.exploded = true
-        if (typeof sound !== 'undefined') sound.slam()
+        if (typeof sound !== 'undefined') {
+          if (sound.enemyAoE) sound.enemyAoE(aoe.isSlamTelegraph ? 'slam' : 'explosion')
+          else if (sound.slam) sound.slam()
+        }
         burst(aoe.x, aoe.y, aoe.secondaryColor, 18, 90)
+      }
 
-        // 判定法阵爆发伤害
-        const dPlayer = Math.hypot(game.player.x - aoe.x, game.player.y - aoe.y)
-        if (dPlayer < aoe.r + game.player.r && game.player.invuln <= 0) {
-          const boss = game.boss
-          const isEnraged = boss && boss.phaseIndex >= 1
-          const aoePct = aoe.isSlamTelegraph ? 0.24 : (0.18 + (isEnraged ? 0.06 : 0))
-          const dmg = Math.max(isHeadless ? 6 : Math.round(aoe.damage || 16), Math.round(game.maxHp * aoePct))
-          game.hp -= dmg
-          game.player.invuln = 0.75
-          game.cameraShake = 0.28
-          burst(game.player.x, game.player.y, aoe.color, 12, 60)
-          if (typeof pulseGamepad === 'function') pulseGamepad(0.4, 0.6, 200)
-          addLog(aoe.isSlamTelegraph ? `被白骨巨臂狂暴拍击命中，受到 ${Math.round(dmg)} 点范围伤害！` : `触碰领主地脉煞气法阵，承受 ${Math.round(dmg)} 点范围伤害（约 ${Math.round(aoePct * 100)}% 生命）！`)
-          if (game.hp <= 0) {
-            endRun()
-            return
+      // 判定法阵爆发伤害：在 activeTimer (0.55s) 整个火柱冲天持续期内均有效，命中一次后标记 hitPlayer
+      // 杜绝因玩家在爆发首帧存在一丝受击保护而导致后续 0.55 秒内踩入火柱完全无伤害的严重 Bug！
+      if (!aoe.hitPlayer) {
+        const dPlayer = Math.hypot(game.player.x - aoe.x, Math.max(game.player.y - 16, Math.min(game.player.y, aoe.y)) - aoe.y)
+        if (dPlayer < aoe.r + game.player.r) {
+          if (game.testGodMode) {
+            aoe.hitPlayer = true
+            burst(game.player.x, game.player.y - 8, '#ffd166', 6, 30)
+          } else if (game.player.invuln <= 0) {
+            aoe.hitPlayer = true
+            const boss = game.boss
+            const isEnraged = boss && boss.phaseIndex >= 1
+            const aoePct = aoe.isSlamTelegraph ? 0.24 : (0.18 + (isEnraged ? 0.06 : 0))
+            const dmg = Math.max(isHeadless ? 6 : Math.round(aoe.damage || 16), Math.round(game.maxHp * aoePct))
+            game.hp -= dmg
+            game.player.invuln = 0.55
+            game.cameraShake = 0.28
+            burst(game.player.x, game.player.y - 8, aoe.color, 12, 60)
+            if (typeof sound !== 'undefined') {
+              if (sound.playerHurt) sound.playerHurt(aoe.isSlamTelegraph ? 'heavy' : 'explosion')
+              else if (sound.hit) sound.hit()
+            }
+            if (typeof pulseGamepad === 'function') pulseGamepad(0.4, 0.6, 200)
+            if (aoe.isSlamTelegraph) {
+              const kAngle = Math.atan2(game.player.y - aoe.y, game.player.x - aoe.x) || 0
+              game.player.x = Math.max(24, Math.min(ARENA_WIDTH - 24, game.player.x + Math.cos(kAngle) * 28))
+              game.player.y = Math.max(24, Math.min(ARENA_HEIGHT - 24, game.player.y + Math.sin(kAngle) * 28))
+            }
+            addLog(aoe.isSlamTelegraph ? `被白骨巨臂狂暴拍击命中，受到 ${Math.round(dmg)} 点范围伤害！` : `触碰领主地脉煞气法阵，承受 ${Math.round(dmg)} 点范围伤害（约 ${Math.round(aoePct * 100)}% 生命）！`)
+            if (game.hp <= 0) {
+              endRun()
+              return
+            }
           }
         }
       }
       aoe.activeTimer -= dt
     }
   }
-  game.bossAoEs = game.bossAoEs.filter(a => a.activeTimer > 0 || a.telegraphTimer > 0)
+  game.bossAoEs = game.bossAoEs.filter(a => {
+    if (a.type === 'asura_blackhole') return !a.exploded && a.timer > -0.05
+    return a.activeTimer > 0 || a.telegraphTimer > 0
+  })
 }
 
 /* ---------- 领主受击、多阶段转阶段与击杀掉落 ---------- */
@@ -6977,8 +8249,23 @@ function damageBoss(amount) {
   boss.hp -= dmg
   boss.hit = 0.16
 
+  const curWType = (game.player && (game.player.weaponType || (game.weapons && game.weapons[0] && (game.weapons[0].weaponType || game.weapons[0].id)))) || 'sword'
+  if (typeof sound !== 'undefined' && sound.hitEnemy) {
+    sound.hitEnemy(crit.is, curWType, true)
+  }
+
+  if (crit.is) {
+    game.cameraShake = Math.max(game.cameraShake || 0, 0.14)
+    game.hitstop = 0.04
+    if (!isHeadless && typeof pulseGamepad === 'function') {
+      pulseGamepad(0.28, 0.45, 90)
+    }
+  } else {
+    game.cameraShake = Math.max(game.cameraShake || 0, 0.05)
+  }
+
   if (!isHeadless && typeof spawnHitImpact === 'function') {
-    spawnHitImpact(boss.x, boss.y, hasLivingArms ? '#06d6a0' : '#ffbe0b', crit.is ? 12 : 8)
+    spawnHitImpact(boss.x, boss.y, hasLivingArms ? '#06d6a0' : '#ffbe0b', crit.is ? 16 : 8, crit.is)
   }
 
   spawnDamageNumber(
@@ -7033,6 +8320,11 @@ function triggerBossPhaseTransition() {
       })
     }
     initCorpseEmperorArms(boss, 1)
+  }
+
+  // 九天噬魂魔尊转阶段
+  if (boss.id === 'asura_demon') {
+    initAsuraDemon(boss, boss.phaseIndex)
   }
 
   // 狂暴特效与道音
@@ -7126,11 +8418,23 @@ function defeatBoss() {
   if (boss.id === 'primordial_god') {
     game.isAscended = true
     if (!isHeadless) {
+      if (game.isTestLevel) {
+        if (typeof stopBossStage === 'function') stopBossStage()
+        if (typeof ui !== 'undefined' && ui.timer) ui.timer.textContent = '演武场'
+        return
+      }
       setTimeout(() => {
         showAscensionModal()
       }, 700)
       return
     }
+  }
+
+  // 演武场模式处理：不进入常规关卡结算流程，恢复演武场HUD
+  if (game.isTestLevel) {
+    if (typeof stopBossStage === 'function') stopBossStage()
+    if (typeof ui !== 'undefined' && ui.timer) ui.timer.textContent = '演武场'
+    return
   }
 
   // 领主战结束，进入结算流程 (浏览器端立即进入神识吸附与清点；无头模式等待本关倒计时结束进入结算)
@@ -7215,10 +8519,12 @@ function updateBossHudUI() {
 
   if (!boss || !game.isBossStage) {
     hudBar.classList.add('hidden')
+    hudBar.classList.remove('test-mode')
     return
   }
 
   hudBar.classList.remove('hidden')
+  hudBar.classList.toggle('test-mode', !!game.isTestLevel)
   const titleEl = document.querySelector('#boss-hud-title')
   const phaseEl = document.querySelector('#boss-hud-phase')
   const fillEl = document.querySelector('#boss-hp-fill')
@@ -7252,10 +8558,247 @@ function updateBossHudUI() {
 /* ---------- 领主、法阵与弹幕 Canvas 绘制系统 ---------- */
 
 function drawBossAoEs(ctx) {
+  // 九天噬魂魔尊：三阶段六极崩灭全屏旋转激光
+  if (game.boss && game.boss.id === 'asura_demon' && game.boss.laserState && game.boss.laserState !== 'idle') {
+    const boss = game.boss
+    const bx = ARENA_WIDTH / 2
+    const by = ARENA_HEIGHT / 2
+    const beamCount = 6
+    const beamAngleStep = (Math.PI * 2) / beamCount
+
+    if (boss.laserState === 'moving_to_center') {
+      ctx.save()
+      ctx.translate(bx, by)
+      const t = game.elapsed || 0
+      ctx.rotate(t * 1.8)
+      ctx.strokeStyle = 'rgba(247, 37, 133, 0.75)'
+      ctx.lineWidth = 2.5
+      ctx.setLineDash([12, 8])
+      ctx.beginPath()
+      ctx.arc(0, 0, 72, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      // 六角光标
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2
+        ctx.fillStyle = '#06d6a0'
+        ctx.beginPath()
+        ctx.arc(Math.cos(a) * 72, Math.sin(a) * 72, 4, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      ctx.rotate(-t * 3.2)
+      ctx.strokeStyle = 'rgba(6, 214, 160, 0.6)'
+      ctx.lineWidth = 1.5
+      ctx.strokeRect(-42, -42, 84, 84)
+      ctx.restore()
+
+      // 阵眼聚能文字提示
+      ctx.save()
+      ctx.font = 'bold 12px sans-serif'
+      ctx.fillStyle = '#f72585'
+      ctx.textAlign = 'center'
+      ctx.shadowColor = '#f72585'
+      ctx.shadowBlur = 8
+      ctx.fillText('⚠️ 魔尊归位阵眼 · 六极崩灭即将开启', bx, by - 86)
+      ctx.restore()
+    } else if (boss.laserState === 'telegraph') {
+      ctx.save()
+      const progress = 1 - (boss.laserTelegraphTimer / (boss.laserMaxTelegraph || 1.6))
+      ctx.strokeStyle = '#f72585'
+      ctx.lineWidth = 2
+      ctx.setLineDash([10, 8])
+      for (let i = 0; i < beamCount; i++) {
+        const angle = boss.laserAngle + i * beamAngleStep
+        ctx.beginPath()
+        ctx.moveTo(bx, by)
+        ctx.lineTo(bx + Math.cos(angle) * 1200, by + Math.sin(angle) * 1200)
+        ctx.stroke()
+      }
+      ctx.setLineDash([])
+
+      // 汇聚粒子
+      ctx.globalCompositeOperation = 'lighter'
+      for (let i = 0; i < beamCount; i++) {
+        const angle = boss.laserAngle + i * beamAngleStep
+        const pDist = 300 * (1 - progress)
+        ctx.fillStyle = '#06d6a0'
+        ctx.beginPath()
+        ctx.arc(bx + Math.cos(angle) * pDist, by + Math.sin(angle) * pDist, 4, 0, Math.PI * 2)
+        ctx.fill()
+      }
+      ctx.restore()
+    } else if (boss.laserState === 'firing') {
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+      for (let i = 0; i < beamCount; i++) {
+        const angle = boss.laserAngle + i * beamAngleStep
+        const ux = Math.cos(angle)
+        const uy = Math.sin(angle)
+        const ex = bx + ux * 1300
+        const ey = by + uy * 1300
+
+        // 外层暗紫晕光 (30px)
+        ctx.strokeStyle = 'rgba(114, 9, 183, 0.45)'
+        ctx.lineWidth = 30
+        ctx.beginPath()
+        ctx.moveTo(bx, by)
+        ctx.lineTo(ex, ey)
+        ctx.stroke()
+
+        // 中层炽热极光 (16px)
+        ctx.strokeStyle = 'rgba(247, 37, 133, 0.75)'
+        ctx.lineWidth = 16
+        ctx.beginPath()
+        ctx.moveTo(bx, by)
+        ctx.lineTo(ex, ey)
+        ctx.stroke()
+
+        // 内层青白高能神核 (6px)
+        ctx.strokeStyle = 'rgba(224, 255, 255, 0.95)'
+        ctx.lineWidth = 6
+        ctx.beginPath()
+        ctx.moveTo(bx, by)
+        ctx.lineTo(ex, ey)
+        ctx.stroke()
+      }
+
+      // 中心凝聚爆裂光球
+      const cGrad = ctx.createRadialGradient(bx, by, 6, bx, by, 32)
+      cGrad.addColorStop(0, '#ffffff')
+      cGrad.addColorStop(0.5, '#06d6a0')
+      cGrad.addColorStop(1, 'transparent')
+      ctx.fillStyle = cGrad
+      ctx.beginPath()
+      ctx.arc(bx, by, 32, 0, Math.PI * 2)
+      ctx.fill()
+
+      ctx.restore()
+    }
+  }
+
+  // 九天噬魂魔尊：黑洞前置地面预警圈 (Telegraph 0.6s)
+  if (game.boss && game.boss.id === 'asura_demon' && game.boss.state === 'casting_blackhole' && game.boss.blackholeTarget) {
+    const tgt = game.boss.blackholeTarget
+    const castProgress = 1 - Math.max(0, game.boss.castTimer) / (game.boss.maxCastTimer || 0.6)
+    const warnRadius = (game.boss.currentPhase && game.boss.currentPhase.aoeRadius) || 105
+    const suctionR = 175
+
+    ctx.save()
+    ctx.translate(tgt.x, tgt.y)
+
+    // 外围引力波纹收缩圈
+    const collapseR = suctionR * (1 - castProgress * 0.35)
+    ctx.strokeStyle = 'rgba(114, 9, 183, 0.45)'
+    ctx.lineWidth = 2
+    ctx.setLineDash([8, 6])
+    ctx.beginPath()
+    ctx.arc(0, 0, collapseR, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    // 危险核心半透明警告底色
+    ctx.fillStyle = 'rgba(114, 9, 183, 0.18)'
+    ctx.beginPath()
+    ctx.arc(0, 0, warnRadius, 0, Math.PI * 2)
+    ctx.fill()
+
+    // 危险边界警示虚线
+    const isFlash = Math.floor(castProgress * 12) % 2 === 0
+    ctx.strokeStyle = isFlash ? '#ff4d4f' : '#f72585'
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    ctx.arc(0, 0, warnRadius, 0, Math.PI * 2)
+    ctx.stroke()
+
+    // 充能倒计时圆弧
+    ctx.strokeStyle = '#f72585'
+    ctx.lineWidth = 4
+    ctx.beginPath()
+    ctx.arc(0, 0, warnRadius + 4, -Math.PI / 2, -Math.PI / 2 + castProgress * Math.PI * 2)
+    ctx.stroke()
+
+    // 警示文字
+    ctx.font = 'bold 12px sans-serif'
+    ctx.fillStyle = '#ff4d4f'
+    ctx.textAlign = 'center'
+    ctx.shadowColor = '#ff4d4f'
+    ctx.shadowBlur = 8
+    ctx.fillText('⚠️ 虚空塌陷 · 黑洞即将成型', 0, -warnRadius - 12)
+
+    ctx.restore()
+  }
+
   if (!game.bossAoEs || !game.bossAoEs.length) return
 
   for (const aoe of game.bossAoEs) {
     ctx.save()
+    if (aoe.type === 'asura_blackhole') {
+      ctx.translate(aoe.x, aoe.y)
+      const timeLeft = Math.max(0, aoe.timer)
+      const maxTime = aoe.maxTimer || 3.8
+      const progress = 1 - timeLeft / maxTime
+
+      // 1. 外围引力吸附范围指示圈
+      ctx.strokeStyle = 'rgba(114, 9, 183, 0.35)'
+      ctx.lineWidth = 2
+      ctx.setLineDash([8, 8])
+      ctx.beginPath()
+      ctx.arc(0, 0, aoe.suctionRadius || 175, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      // 2. 核心爆炸危险边界与倒计时预警圈
+      const isUrgent = timeLeft < 1.0
+      ctx.strokeStyle = isUrgent ? (Math.floor(timeLeft * 8) % 2 === 0 ? '#ff4d4f' : '#f72585') : 'rgba(247, 37, 133, 0.8)'
+      ctx.lineWidth = isUrgent ? 3.5 : 2.5
+      ctx.beginPath()
+      ctx.arc(0, 0, aoe.r, 0, Math.PI * 2)
+      ctx.stroke()
+
+      // 倒计时充能弧
+      ctx.strokeStyle = isUrgent ? '#ff4d4f' : '#06d6a0'
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.arc(0, 0, aoe.r + 4, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2)
+      ctx.stroke()
+
+      // 3. 黑洞本体贴图绘制 (effect_asura_blackhole.png)
+      const bhSize = aoe.r * 2.3
+      if (typeof effectAsuraBlackholeLoaded !== 'undefined' && effectAsuraBlackholeLoaded && effectAsuraBlackholeImg) {
+        ctx.save()
+        ctx.rotate(aoe.spin || 0)
+        const pulse = 1.0 + Math.sin(game.elapsed * 6) * 0.04
+        ctx.scale(pulse, pulse)
+        ctx.drawImage(effectAsuraBlackholeImg, -bhSize / 2, -bhSize / 2, bhSize, bhSize)
+        ctx.restore()
+      } else {
+        const bhGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, aoe.r)
+        bhGrad.addColorStop(0, '#000000')
+        bhGrad.addColorStop(0.5, '#7209b7')
+        bhGrad.addColorStop(1, 'transparent')
+        ctx.fillStyle = bhGrad
+        ctx.beginPath()
+        ctx.arc(0, 0, aoe.r, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      // 4. 引力涡流粒子与向心汇聚流光
+      ctx.globalCompositeOperation = 'lighter'
+      for (let s = 0; s < 4; s++) {
+        const spiralAngle = (aoe.spin * 1.5) + (s * Math.PI * 0.5)
+        const inDist = aoe.r * (0.3 + 0.6 * ((game.elapsed * 1.2 + s * 0.25) % 1.0))
+        ctx.fillStyle = s % 2 === 0 ? '#06d6a0' : '#f72585'
+        ctx.beginPath()
+        ctx.arc(Math.cos(spiralAngle) * inDist, Math.sin(spiralAngle) * inDist, 3.5, 0, Math.PI * 2)
+        ctx.fill()
+      }
+
+      ctx.restore()
+      continue
+    }
+
     if (aoe.isHazardPool) {
       // 绘制持续幽冥毒沼 (Lingering Ghost Fire Poison Pool with Dedicated Sprite)
       ctx.translate(aoe.x, aoe.y)
@@ -7943,61 +9486,264 @@ function drawAsuraDemonModel(ctx, boss) {
   ctx.save()
   const t = boss.animTimer
   const isEnraged = boss.phaseIndex >= 1
+  const isFinalPhase = boss.phaseIndex >= 2
 
-  // 六臂魔影
-  const armCount = isEnraged ? 6 : 4
-  for (let i = 0; i < armCount; i++) {
-    const angle = (i / armCount) * Math.PI * 2 + Math.sin(t * 3 + i) * 0.2
-    ctx.save()
-    ctx.rotate(angle)
-    ctx.fillStyle = '#3a0ca3'
-    ctx.fillRect(boss.r * 0.6, -6, 24, 12)
-    // 魔爪爪尖
-    ctx.fillStyle = '#f72585'
+  // 1. 背部虚空真魔神环 (紫黑魔焰、魔尊神威与阶段强化)
+  const haloRadius = boss.r * 1.15
+  ctx.save()
+  ctx.rotate(t * 0.8)
+  const haloGrad = ctx.createRadialGradient(0, 0, haloRadius * 0.7, 0, 0, haloRadius * 1.3)
+  haloGrad.addColorStop(0, 'transparent')
+  haloGrad.addColorStop(0.5, isFinalPhase ? 'rgba(247, 37, 133, 0.75)' : 'rgba(114, 9, 183, 0.6)')
+  haloGrad.addColorStop(1, 'transparent')
+  ctx.fillStyle = haloGrad
+  ctx.beginPath()
+  ctx.arc(0, 0, haloRadius * 1.2, 0, Math.PI * 2)
+  ctx.fill()
+
+  // 神环符文光尖
+  const rayCount = isFinalPhase ? 12 : 8
+  for (let i = 0; i < rayCount; i++) {
+    const rAngle = (i / rayCount) * Math.PI * 2
+    ctx.strokeStyle = i % 2 === 0 ? '#f72585' : '#06d6a0'
+    ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.moveTo(boss.r * 0.6 + 24, -8)
-    ctx.lineTo(boss.r * 0.6 + 34, 0)
-    ctx.lineTo(boss.r * 0.6 + 24, 8)
-    ctx.closePath()
-    ctx.fill()
-    ctx.restore()
+    ctx.moveTo(Math.cos(rAngle) * haloRadius, Math.sin(rAngle) * haloRadius)
+    ctx.lineTo(Math.cos(rAngle) * (haloRadius + 14), Math.sin(rAngle) * (haloRadius + 14))
+    ctx.stroke()
+  }
+  ctx.restore()
+
+  // 2. Boss 贴图与 8 帧序列帧渲染 (boss_asura_demon_sheet.png & boss_asura_demon.png)
+  const currentSheetImg = bossAsuraDemonSheetImg
+  const currentSheetLoaded = bossAsuraDemonSheetLoaded
+  if (currentSheetLoaded && currentSheetImg) {
+    if (!boss.sheetAnim && typeof SpriteSheetAnimation !== 'undefined') {
+      boss.sheetAnim = new SpriteSheetAnimation({
+        img: currentSheetImg,
+        frameW: 180,
+        frameH: 180,
+        cols: 4,
+        rows: 2,
+        totalFrames: 8,
+        fps: 8.5,
+        loop: true
+      })
+    }
   }
 
-  // 魔尊核心
-  const grad = ctx.createRadialGradient(0, 0, 5, 0, 0, boss.r * 0.8)
-  grad.addColorStop(0, '#f72585')
-  grad.addColorStop(0.6, '#7209b7')
-  grad.addColorStop(1, '#10002b')
-  ctx.fillStyle = grad
-  ctx.beginPath()
-  ctx.arc(0, 0, boss.r * 0.8, 0, Math.PI * 2)
-  ctx.fill()
+  const isCastingBarrage = boss.state === 'casting_barrage'
+  const isCastingBlackhole = boss.state === 'casting_blackhole'
+  const isRushTelegraph = boss.state === 'telegraph_rush'
+  const isRushing = boss.state === 'rushing'
+  const isLaserTelegraph = boss.laserState === 'telegraph'
+  const isLaserFiring = boss.laserState === 'firing'
 
-  // 极恶魔角
-  ctx.fillStyle = '#240046'
-  ctx.beginPath()
-  ctx.moveTo(-18, -boss.r * 0.5)
-  ctx.quadraticCurveTo(-35, -boss.r - 20, -12, -boss.r - 16)
-  ctx.lineTo(-8, -boss.r * 0.5)
-  ctx.closePath()
-  ctx.fill()
+  const floatY = Math.sin(t * 3.2) * 4
+  const pulse = 1.0 + Math.sin(t * 4.0) * 0.025
+  const spriteSize = boss.r * 2.85 // ~165px
 
-  ctx.beginPath()
-  ctx.moveTo(18, -boss.r * 0.5)
-  ctx.quadraticCurveTo(35, -boss.r - 20, 12, -boss.r - 16)
-  ctx.lineTo(8, -boss.r * 0.5)
-  ctx.closePath()
-  ctx.fill()
+  if ((boss.sheetAnim && currentSheetLoaded && currentSheetImg) || (typeof bossAsuraDemonLoaded !== 'undefined' && bossAsuraDemonLoaded && bossAsuraDemonImg)) {
+    ctx.save()
+    ctx.translate(0, floatY)
 
-  // 三目血瞳
-  ctx.fillStyle = '#f72585'
-  ctx.shadowColor = '#f72585'
-  ctx.shadowBlur = 12
-  ctx.beginPath()
-  ctx.arc(-10, -6, 4, 0, Math.PI * 2)
-  ctx.arc(10, -6, 4, 0, Math.PI * 2)
-  ctx.arc(0, -16, 5, 0, Math.PI * 2)
-  ctx.fill()
+    // 动作形态自适应形变 (Squash & Stretch)
+    if (isRushing) {
+      ctx.scale(1.18, 0.88)
+    } else if (isRushTelegraph) {
+      ctx.scale(0.92, 1.08)
+    } else if (isCastingBlackhole) {
+      const bhSquash = 1.0 + Math.sin(t * 12) * 0.04
+      ctx.scale(bhSquash, 1.0 / bhSquash)
+    } else {
+      ctx.scale(pulse, pulse)
+    }
+
+    if (boss.sheetAnim && currentSheetLoaded && currentSheetImg) {
+      boss.sheetAnim.draw(ctx, 0, -4, spriteSize / 180, 0)
+    } else {
+      ctx.drawImage(bossAsuraDemonImg, -spriteSize / 2, -spriteSize / 2 - 4, spriteSize, spriteSize)
+    }
+
+    // 受击白光闪烁 (Hit Flash)
+    if (boss.hit > 0) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+      const hitAlpha = Math.min(0.5, (boss.hit / 0.16) * 0.45)
+      if (boss.sheetAnim && currentSheetLoaded && currentSheetImg) {
+        boss.sheetAnim.draw(ctx, 0, -4, spriteSize / 180, 0, hitAlpha)
+      } else {
+        ctx.globalAlpha = hitAlpha
+        ctx.drawImage(bossAsuraDemonImg, -spriteSize / 2, -spriteSize / 2 - 4, spriteSize, spriteSize)
+      }
+      ctx.restore()
+    }
+    ctx.restore()
+
+    // 3. 四大核心攻击动作专属特效层 (Vivid Action Effects)
+    // 3.1 吐魂魔魂喷涌 (Casting Soul Barrage)
+    if (isCastingBarrage) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+      const soulT = game.elapsed || 0
+      const ringR = ((soulT * 90) % 45) + 12
+      const ringAlpha = Math.max(0, 1 - ringR / 55)
+      ctx.strokeStyle = `rgba(6, 214, 160, ${ringAlpha})`
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.arc(0, -18 + floatY, ringR, 0, Math.PI * 2)
+      ctx.stroke()
+
+      const mawGrad = ctx.createRadialGradient(0, -18 + floatY, 2, 0, -18 + floatY, 24)
+      mawGrad.addColorStop(0, '#ffffff')
+      mawGrad.addColorStop(0.35, '#06d6a0')
+      mawGrad.addColorStop(1, 'transparent')
+      ctx.fillStyle = mawGrad
+      ctx.beginPath()
+      ctx.arc(0, -18 + floatY, 24, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    }
+
+    // 3.2 黑洞奇点聚能 (Casting Blackhole)
+    if (isCastingBlackhole) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+      const bhT = game.elapsed || 0
+      const coreY = -boss.r * 0.65 + floatY
+      const singRadius = 14 + Math.sin(bhT * 14) * 3
+      const singGrad = ctx.createRadialGradient(0, coreY, 2, 0, coreY, singRadius * 1.5)
+      singGrad.addColorStop(0, '#ffffff')
+      singGrad.addColorStop(0.3, '#f72585')
+      singGrad.addColorStop(0.7, '#7209b7')
+      singGrad.addColorStop(1, 'transparent')
+      ctx.fillStyle = singGrad
+      ctx.beginPath()
+      ctx.arc(0, coreY, singRadius * 1.5, 0, Math.PI * 2)
+      ctx.fill()
+
+      // 8 束向奇点汇聚的虚空螺旋流线
+      ctx.rotate(bhT * 4.0)
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2
+        const dist = 38 + Math.sin(bhT * 8 + i) * 8
+        ctx.strokeStyle = i % 2 === 0 ? 'rgba(247, 37, 133, 0.75)' : 'rgba(114, 9, 183, 0.75)'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.moveTo(Math.cos(a) * dist, coreY + Math.sin(a) * dist)
+        ctx.quadraticCurveTo(Math.cos(a + 0.4) * (dist * 0.5), coreY + Math.sin(a + 0.4) * (dist * 0.5), 0, coreY)
+        ctx.stroke()
+      }
+      ctx.restore()
+    }
+
+    // 3.3 冲锋蓄力与破空暴冲 (Rush Telegraph & Rushing)
+    if (isRushTelegraph) {
+      ctx.save()
+      const aimDir = boss.rushDir || { x: 1, y: 0 }
+      const aimAngle = Math.atan2(aimDir.y, aimDir.x)
+      ctx.rotate(aimAngle - (boss.angle || 0))
+      ctx.strokeStyle = '#ff4d4f'
+      ctx.lineWidth = 3
+      ctx.setLineDash([12, 6])
+      ctx.beginPath()
+      ctx.moveTo(boss.r * 0.8, 0)
+      ctx.lineTo(boss.r * 0.8 + 95, 0)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      ctx.fillStyle = '#ff4d4f'
+      ctx.beginPath()
+      ctx.moveTo(boss.r * 0.8 + 105, 0)
+      ctx.lineTo(boss.r * 0.8 + 88, -8)
+      ctx.lineTo(boss.r * 0.8 + 88, 8)
+      ctx.closePath()
+      ctx.fill()
+      ctx.restore()
+    } else if (isRushing) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.strokeStyle = 'rgba(247, 37, 133, 0.85)'
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.arc(0, floatY, boss.r * 1.25, Math.PI * 0.75, Math.PI * 1.25)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.arc(0, floatY, boss.r * 1.45, Math.PI * 0.8, Math.PI * 1.2)
+      ctx.stroke()
+      ctx.restore()
+    }
+
+    // 3.4 全屏激光阵法聚能 (Laser Telegraph & Firing Array)
+    if (isLaserTelegraph || isLaserFiring) {
+      ctx.save()
+      ctx.globalCompositeOperation = 'lighter'
+      const dir = boss.laserRotateDir || 1
+      const rot = (game.elapsed || 0) * (isLaserFiring ? 3.5 : 1.8) * dir
+      ctx.rotate(rot)
+      ctx.strokeStyle = isLaserFiring ? '#ffffff' : '#f72585'
+      ctx.lineWidth = 2
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2
+        ctx.beginPath()
+        ctx.arc(Math.cos(a) * (boss.r * 1.35), Math.sin(a) * (boss.r * 1.35), isLaserFiring ? 5 : 3.5, 0, Math.PI * 2)
+        ctx.fillStyle = i % 2 === 0 ? '#f72585' : '#06d6a0'
+        ctx.fill()
+      }
+      ctx.restore()
+    }
+  } else {
+    // 降级六臂魔影与高品质矢量真魔模型
+    const armCount = isEnraged ? 6 : 4
+    for (let i = 0; i < armCount; i++) {
+      const angle = (i / armCount) * Math.PI * 2 + Math.sin(t * 3 + i) * 0.2
+      ctx.save()
+      ctx.rotate(angle)
+      ctx.fillStyle = '#3a0ca3'
+      ctx.fillRect(boss.r * 0.6, -6, 24, 12)
+      ctx.fillStyle = '#f72585'
+      ctx.beginPath()
+      ctx.moveTo(boss.r * 0.6 + 24, -8)
+      ctx.lineTo(boss.r * 0.6 + 34, 0)
+      ctx.lineTo(boss.r * 0.6 + 24, 8)
+      ctx.closePath()
+      ctx.fill()
+      ctx.restore()
+    }
+
+    const grad = ctx.createRadialGradient(0, 0, 5, 0, 0, boss.r * 0.8)
+    grad.addColorStop(0, '#f72585')
+    grad.addColorStop(0.6, '#7209b7')
+    grad.addColorStop(1, '#10002b')
+    ctx.fillStyle = grad
+    ctx.beginPath()
+    ctx.arc(0, 0, boss.r * 0.8, 0, Math.PI * 2)
+    ctx.fill()
+
+    ctx.fillStyle = '#240046'
+    ctx.beginPath()
+    ctx.moveTo(-18, -boss.r * 0.5)
+    ctx.quadraticCurveTo(-35, -boss.r - 20, -12, -boss.r - 16)
+    ctx.lineTo(-8, -boss.r * 0.5)
+    ctx.closePath()
+    ctx.fill()
+
+    ctx.beginPath()
+    ctx.moveTo(18, -boss.r * 0.5)
+    ctx.quadraticCurveTo(35, -boss.r - 20, 12, -boss.r - 16)
+    ctx.lineTo(8, -boss.r * 0.5)
+    ctx.closePath()
+    ctx.fill()
+
+    ctx.fillStyle = '#f72585'
+    ctx.shadowColor = '#f72585'
+    ctx.shadowBlur = 12
+    ctx.beginPath()
+    ctx.arc(-10, -6, 4, 0, Math.PI * 2)
+    ctx.arc(10, -6, 4, 0, Math.PI * 2)
+    ctx.arc(0, -16, 5, 0, Math.PI * 2)
+    ctx.fill()
+  }
 
   ctx.restore()
 }
@@ -8346,6 +10092,26 @@ function drawBossProjectiles(ctx) {
       ctx.lineTo(-proj.r * 1.5, 4)
       ctx.closePath()
       ctx.fill()
+    } else if (proj.type === 'asura_soul') {
+      const ang = Math.atan2(proj.vy, proj.vx)
+      // effect_asura_soul.png 鬼面朝向右下角约 45 度 (Math.PI / 4)
+      ctx.rotate(ang - Math.PI / 4)
+      ctx.shadowColor = 'rgba(6, 214, 160, 0.65)'
+      ctx.shadowBlur = 10
+      if (typeof effectAsuraSoulLoaded !== 'undefined' && effectAsuraSoulLoaded && effectAsuraSoulImg) {
+        const sSize = Math.max(34, proj.r * 4.0)
+        ctx.globalCompositeOperation = 'source-over'
+        ctx.drawImage(effectAsuraSoulImg, -sSize / 2, -sSize / 2, sSize, sSize)
+      } else {
+        ctx.fillStyle = '#06d6a0'
+        ctx.beginPath()
+        ctx.arc(0, 0, proj.r, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.fillStyle = '#7209b7'
+        ctx.beginPath()
+        ctx.arc(-proj.r * 0.4, 0, proj.r * 0.5, 0, Math.PI * 2)
+        ctx.fill()
+      }
     } else if (proj.type === 'yin_yang_orb') {
       ctx.rotate(game.elapsed * 6)
       ctx.fillStyle = proj.color
@@ -8432,6 +10198,8 @@ class SpriteSheetAnimation {
 function initVFXSystem() {
   if (!game.ghostTrails) game.ghostTrails = []
   if (!game.hitRings) game.hitRings = []
+  if (!game.hitSparks) game.hitSparks = []
+  if (!game.hitFlares) game.hitFlares = []
   if (!game.spriteAnimations) game.spriteAnimations = []
 }
 
@@ -8524,12 +10292,83 @@ function spawnBossGhostTrail(boss) {
   })
 }
 
-function spawnHitImpact(x, y, color = '#ffd166', count = 5) {
-  if (isHeadless) return
+function spawnHitImpact(x, y, color = '#ffd166', count = 5, isCrit = false, force = false) {
+  if (isHeadless && !force && !globalThis.__FORCE_VISUAL_FX__) return
   initVFXSystem()
 
-  // 1. 锐利受击火花向外迸射
-  for (let i = 0; i < count; i++) {
+  // 1. 扩散热浪灵光冲击环 (普通单环，暴击多重双环)
+  if (isCrit) {
+    game.hitRings.push({
+      x,
+      y,
+      r: 8,
+      maxR: 52,
+      color: '#ffffff',
+      life: 0.18,
+      maxLife: 0.18,
+      lineWidth: 3
+    })
+    game.hitRings.push({
+      x,
+      y,
+      r: 12,
+      maxR: 76,
+      color,
+      life: 0.24,
+      maxLife: 0.24,
+      lineWidth: 2
+    })
+  } else {
+    game.hitRings.push({
+      x,
+      y,
+      r: 6,
+      maxR: 30,
+      color,
+      life: 0.15,
+      maxLife: 0.15,
+      lineWidth: 2
+    })
+  }
+  if (game.hitRings.length > 50) game.hitRings.splice(0, game.hitRings.length - 50)
+
+  // 2. 动感拉丝剑芒受击火花 (Motion-stretched Sparks)
+  const sparkCount = isCrit ? 16 : Math.max(6, count + 2)
+  for (let i = 0; i < sparkCount; i++) {
+    const ang = Math.random() * Math.PI * 2
+    const spd = isCrit ? (200 + Math.random() * 260) : (140 + Math.random() * 160)
+    const life = isCrit ? (0.18 + Math.random() * 0.10) : (0.13 + Math.random() * 0.08)
+    const sparkColor = Math.random() < 0.45 ? '#ffffff' : color
+    game.hitSparks.push({
+      x,
+      y,
+      vx: Math.cos(ang) * spd,
+      vy: Math.sin(ang) * spd,
+      color: sparkColor,
+      life,
+      maxLife: life,
+      width: isCrit ? 2.8 : 2.0
+    })
+  }
+  if (game.hitSparks.length > 150) game.hitSparks.splice(0, game.hitSparks.length - 150)
+
+  // 3. 十字/八角耀光爆星闪芒 (Hit Flares)
+  game.hitFlares.push({
+    x,
+    y,
+    color,
+    r: isCrit ? (40 + Math.random() * 8) : (20 + Math.random() * 6),
+    rotation: Math.random() * Math.PI,
+    isCrit: !!isCrit,
+    life: isCrit ? 0.18 : 0.12,
+    maxLife: isCrit ? 0.18 : 0.12,
+    alpha: 1
+  })
+  if (game.hitFlares.length > 40) game.hitFlares.splice(0, game.hitFlares.length - 40)
+
+  // 4. 传统微粒喷射 (保持粒子系统兼容)
+  const particleCount = isCrit ? Math.round(count * 1.5) : count
+  for (let i = 0; i < particleCount; i++) {
     const ang = Math.random() * Math.PI * 2
     const spd = 70 + Math.random() * 140
     game.particles.push({
@@ -8541,17 +10380,6 @@ function spawnHitImpact(x, y, color = '#ffd166', count = 5) {
       color: Math.random() < 0.5 ? color : '#ffffff'
     })
   }
-
-  // 2. 扩散热浪灵光冲击环
-  game.hitRings.push({
-    x,
-    y,
-    r: 6,
-    maxR: 26,
-    color,
-    life: 0.16,
-    maxLife: 0.16
-  })
 }
 
 function playVFXAnimation(type, x, y, options = {}) {
@@ -8573,7 +10401,7 @@ function playVFXAnimation(type, x, y, options = {}) {
 }
 
 function updateVFXSystem(dt) {
-  if (isHeadless) return
+  if (isHeadless && !globalThis.__FORCE_VISUAL_FX__) return
   initVFXSystem()
 
   // 1. 更新神行残影
@@ -8590,7 +10418,30 @@ function updateVFXSystem(dt) {
     if (r.life <= 0) game.hitRings.splice(i, 1)
   }
 
-  // 3. 更新动态法术动画
+  // 3. 更新拉丝受击火花
+  if (game.hitSparks) {
+    const drag = Math.pow(0.86, dt * 60)
+    for (let i = game.hitSparks.length - 1; i >= 0; i--) {
+      const s = game.hitSparks[i]
+      s.x += s.vx * dt
+      s.y += s.vy * dt
+      s.vx *= drag
+      s.vy *= drag
+      s.life -= dt
+      if (s.life <= 0) game.hitSparks.splice(i, 1)
+    }
+  }
+
+  // 4. 更新爆星耀芒
+  if (game.hitFlares) {
+    for (let i = game.hitFlares.length - 1; i >= 0; i--) {
+      const f = game.hitFlares[i]
+      f.life -= dt
+      if (f.life <= 0) game.hitFlares.splice(i, 1)
+    }
+  }
+
+  // 5. 更新动态法术动画
   for (let i = game.spriteAnimations.length - 1; i >= 0; i--) {
     const a = game.spriteAnimations[i]
     a.life -= dt
@@ -8664,21 +10515,103 @@ function drawGhostTrails(ctx) {
 }
 
 function drawHitRings(ctx) {
-  if (isHeadless || !game.hitRings || !game.hitRings.length) return
+  if ((isHeadless && !globalThis.__FORCE_VISUAL_FX__) || !game.hitRings || !game.hitRings.length) return
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
   for (const r of game.hitRings) {
     const p = 1 - r.life / r.maxLife
     const currentR = r.r + (r.maxR - r.r) * p
-    const alpha = Math.max(0, 1 - p) * 0.85
+    const alpha = Math.max(0, 1 - p) * 0.9
 
     ctx.save()
     ctx.strokeStyle = r.color || '#ffd166'
-    ctx.lineWidth = 2 * (1 - p * 0.5)
+    ctx.lineWidth = (r.lineWidth || 2) * (1 - p * 0.45)
     ctx.globalAlpha = alpha
     ctx.beginPath()
     ctx.arc(r.x, r.y, currentR, 0, Math.PI * 2)
     ctx.stroke()
     ctx.restore()
   }
+  ctx.restore()
+}
+
+function drawHitSparks(ctx) {
+  if ((isHeadless && !globalThis.__FORCE_VISUAL_FX__) || !game.hitSparks || !game.hitSparks.length) return
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  ctx.lineCap = 'round'
+  for (const s of game.hitSparks) {
+    const p = Math.max(0, s.life / s.maxLife)
+    const spd = Math.hypot(s.vx, s.vy)
+    if (spd < 1) continue
+    const dirX = s.vx / spd
+    const dirY = s.vy / spd
+    const tailLen = Math.min(26, spd * 0.055) * p
+    ctx.strokeStyle = s.color || '#ffffff'
+    ctx.lineWidth = Math.max(1, (s.width || 2) * p)
+    ctx.globalAlpha = Math.min(1, p * 1.5)
+    ctx.beginPath()
+    ctx.moveTo(s.x, s.y)
+    ctx.lineTo(s.x - dirX * tailLen, s.y - dirY * tailLen)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+function drawHitFlares(ctx) {
+  if ((isHeadless && !globalThis.__FORCE_VISUAL_FX__) || !game.hitFlares || !game.hitFlares.length) return
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  for (const f of game.hitFlares) {
+    const p = 1 - (f.life / f.maxLife)
+    const alpha = Math.max(0, 1 - p) * (f.alpha || 1)
+    const curR = f.r * (0.35 + 0.65 * Math.sin(p * Math.PI * 0.5))
+    const rot = f.rotation + p * 0.35
+
+    ctx.save()
+    ctx.translate(f.x, f.y)
+    ctx.rotate(rot)
+    ctx.globalAlpha = alpha
+
+    // 1. 核心高光小光晕
+    const glowGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, curR * 0.55)
+    glowGrad.addColorStop(0, '#ffffff')
+    glowGrad.addColorStop(0.4, f.color || '#ffd166')
+    glowGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
+    ctx.fillStyle = glowGrad
+    ctx.beginPath()
+    ctx.arc(0, 0, curR * 0.55, 0, Math.PI * 2)
+    ctx.fill()
+
+    // 2. 锐利十字/八角星芒
+    const rays = f.isCrit ? 8 : 4
+    for (let r = 0; r < rays; r++) {
+      const rayAng = (r * Math.PI * 2) / rays
+      const isSubRay = (r % 2 === 1)
+      const rayLen = isSubRay ? curR * 0.55 : curR
+      const rayThick = (isSubRay ? 2.5 : 4) * (1 - p * 0.7)
+
+      ctx.save()
+      ctx.rotate(rayAng)
+      ctx.beginPath()
+      ctx.moveTo(0, -rayThick * 0.5)
+      ctx.lineTo(rayLen, 0)
+      ctx.lineTo(0, rayThick * 0.5)
+      ctx.lineTo(-rayLen * 0.25, 0)
+      ctx.closePath()
+
+      const rayGrad = ctx.createLinearGradient(0, 0, rayLen, 0)
+      rayGrad.addColorStop(0, '#ffffff')
+      rayGrad.addColorStop(0.45, f.color || '#ffd166')
+      rayGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
+      ctx.fillStyle = rayGrad
+      ctx.fill()
+      ctx.restore()
+    }
+
+    ctx.restore()
+  }
+  ctx.restore()
 }
 
 function drawSpriteAnimations(ctx) {
@@ -8755,9 +10688,13 @@ const gamepadState = {
   active: false
 }
 
+let _lastGamepadRumbleTime = 0
 // 仙灵触感震动反馈
 function pulseGamepad(weak = 0.3, strong = 0.4, durationMs = 150) {
   if (!gamepadState.rumbleEnabled || typeof navigator === 'undefined' || !navigator.getGamepads) return
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+  if (now - _lastGamepadRumbleTime < 75) return
+  _lastGamepadRumbleTime = now
   try {
     const pads = navigator.getGamepads()
     for (const pad of pads) {
@@ -9598,7 +11535,7 @@ const game = {
   enemies: [], projectiles: [], drops: [], particles: [], zaps: [], markers: [], lootBag: [],
   player: { x: 480, y: 270, r: 13, invuln: 0, attackTimer: 0, attackAngle: 0, charId: 'sword', weaponType: 'sword', charName: '凌虚子' },
   baseAttackRange: 140, bonusAttackRange: 0, attackRange: 140, specialAttacks: [],
-  cameraShake: 0, _lastShakeTime: 0, hammerRadiusBonus: 0, dingRadiusBonus: 0, dragonRangeBonus: 0, daggerRangeBonus: 0, baozhuRadiusBonus: 0, baguaRadiusBonus: 0, fuchenRangeBonus: 0, thunderChainBonus: 0,
+  cameraShake: 0, hitstop: 0, _lastShakeTime: 0, hammerRadiusBonus: 0, dingRadiusBonus: 0, dragonRangeBonus: 0, daggerRangeBonus: 0, baozhuRadiusBonus: 0, baguaRadiusBonus: 0, fuchenRangeBonus: 0, thunderChainBonus: 0,
   chainArcLevel: 0, chainArcN: null, chainArcs: [], chainArcCooldown: 0, _currentAttackIsPrimary: false,
   blazingFireLevel: 0, blazingBursts: [], blazingMotes: [], blazingEmberParticles: [], pendingDetonations: [], _isDetonating: false,
   offensiveSlots: [null, null, null, null],
@@ -10477,8 +12414,13 @@ function movePlayer(dt) {
     let speedMult = 1.0
     if ((game.playerFreezeTimer || 0) > 0) {
       speedMult = 0
-    } else if ((game.playerChillTimer || 0) > 0) {
-      speedMult = Math.max(0.2, 1.0 - (game.playerChillSlow || 0.45))
+    } else {
+      if ((game.playerChillTimer || 0) > 0) {
+        speedMult *= Math.max(0.2, 1.0 - (game.playerChillSlow || 0.45))
+      }
+      if ((game.playerBlackholeSlowTimer || 0) > 0) {
+        speedMult *= 0.70 // 噬魂黑洞引力迟滞 30% (保留 70% 移动能力)
+      }
     }
 
     const finalSpeed = effectiveSpeed * stickRatio * speedMult
@@ -10557,6 +12499,21 @@ function updatePlayerStatusEffects(dt) {
       })
     }
   }
+
+  // 4. 噬魂黑洞减速倒计时
+  if ((game.playerBlackholeSlowTimer || 0) > 0) {
+    game.playerBlackholeSlowTimer = Math.max(0, game.playerBlackholeSlowTimer - dt)
+    if (!isHeadless && Math.random() < 0.25 && game.particles && game.particles.length < 90) {
+      game.particles.push({
+        x: game.player.x + (Math.random() - 0.5) * 14,
+        y: game.player.y + (Math.random() - 0.5) * 14,
+        vx: (Math.random() - 0.5) * 12,
+        vy: (Math.random() - 0.5) * 12,
+        life: 0.2,
+        color: '#7209b7'
+      })
+    }
+  }
 }
 
 /* ---------- 主循环 ---------- */
@@ -10567,9 +12524,18 @@ function update(dt) {
     updateStageClear(dt)
     return
   }
+  if (game.hitstop > 0) {
+    game.hitstop = Math.max(0, game.hitstop - dt)
+    if (!isHeadless) {
+      if (typeof updateVFXSystem === 'function') updateVFXSystem(dt)
+      if (game.cameraShake > 0) game.cameraShake = Math.max(0, game.cameraShake - dt * 5.0)
+      return
+    }
+  }
   game.elapsed += dt
   game.stageElapsed += dt
   game.player.invuln = Math.max(0, game.player.invuln - dt)
+  game.playerProjectileGrace = Math.max(0, (game.playerProjectileGrace || 0) - dt)
   game.player.attackTimer = Math.max(0, (game.player.attackTimer || 0) - dt)
   game.flash = Math.max(0, game.flash - dt * 1.6)
   movePlayer(dt)
@@ -10744,9 +12710,17 @@ function update(dt) {
         const foeName = enemy.kind === 'elite_frost_brute' ? '玄霜凝晶巨兕近身重踏' : (isElite ? '赤炼熔岩巨兕近身重踏' : '妖物近身')
         addLog(`${foeName}，受到 ${finalDmg} 点伤害（约 ${Math.round(dmgPct * 100)}% 生命）。`)
         if (!isHeadless) {
-          sound.hit()
-          burst(game.player.x, game.player.y - 10, '#f24838', 5, 45)
-          if (typeof pulseGamepad === 'function') pulseGamepad(0.25, 0.35, 120)
+          if (typeof sound !== 'undefined') {
+            if (sound.playerHurt) sound.playerHurt(isElite ? 'heavy' : 'bullet')
+            else sound.hit()
+          }
+          burst(game.player.x, game.player.y - 10, '#f24838', isElite ? 12 : 5, isElite ? 75 : 45)
+          if (typeof pulseGamepad === 'function') pulseGamepad(isElite ? 0.45 : 0.25, isElite ? 0.6 : 0.35, isElite ? 220 : 120)
+        }
+        if ((isElite || isBrute) && (!isHeadless || globalThis.__FORCE_VISUAL_FX__)) {
+          const kAngle = Math.atan2(game.player.y - enemy.y, game.player.x - enemy.x) || 0
+          game.player.x = Math.max(24, Math.min(ARENA_WIDTH - 24, game.player.x + Math.cos(kAngle) * (isElite ? 24 : 14)))
+          game.player.y = Math.max(24, Math.min(ARENA_HEIGHT - 24, game.player.y + Math.sin(kAngle) * (isElite ? 24 : 14)))
         }
         if (game.hp <= 0) {
           if (game.isTestLevel || game.testGodMode) {
@@ -10898,7 +12872,7 @@ function update(dt) {
       if (distance(game.player, enemy) < 100) {
         enemy.x += (enemy.x - game.player.x) * .06
         enemy.y += (enemy.y - game.player.y) * .06
-        if (isHeadless) { enemy.hp -= 3 * game.formationPower; if (enemy.hp <= 0) defeat(enemy) } else { damageEnemy(enemy, 3 * game.formationPower, '#64e8cb') }
+        if (isHeadless) { enemy.hp -= 3 * game.formationPower; if (enemy.hp <= 0) defeat(enemy) } else { damageEnemy(enemy, 3 * game.formationPower, '#64e8cb', { isTick: true }) }
       }
     }
   }
@@ -11561,6 +13535,11 @@ function confirmSettlement() {
   game.hp = Math.min(game.maxHp, game.hp + 15)
   game.player.x = ARENA_WIDTH / 2
   game.player.y = ARENA_HEIGHT / 2
+  game.player.invuln = 0
+  game.playerProjectileGrace = 0
+  game.clearingStage = false
+  game.stageClearPhase = 'none'
+  stageClearPhase = 'none'
   game.paused = false
   ui.overlay.classList.add('hidden')
   if (!isHeadless && isMaxRealmMaxLevel() && (game.bossesDefeated >= 4) && !game.primordialGodEncountered) {
@@ -11643,6 +13622,15 @@ function updateUI() {
     const s = String(eSec % 60).padStart(2, '0')
     if (ui.timer) ui.timer.textContent = `无尽 · ${m}:${s}`
     if (ui.arenaRealm) ui.arenaRealm.textContent = '无尽试炼 · 化神境'
+  } else if (game.isTestLevel) {
+    if (ui.timer) ui.timer.textContent = '演武场'
+    if (ui.arenaRealm) {
+      if (game.isBossStage && game.boss) {
+        ui.arenaRealm.textContent = `演武试炼 · 【领主】${game.boss.name}`
+      } else {
+        ui.arenaRealm.textContent = '演武试炼场 · 自由演练'
+      }
+    }
   } else {
     if (ui.timer) ui.timer.textContent = formatTime(game.stageTime)
     if (ui.arenaRealm) {
@@ -12764,6 +14752,8 @@ function drawOrientedWeaponSprite(c, wType, x, y, flightAngle, size = 42, glowCo
     angleOffset = Math.PI * 0.20 // angled at -35 deg
   } else if (wType === 'ghost_banner' || wType === 'formation_flag') {
     angleOffset = -Math.PI * 0.15
+  } else if (wType === 'dragon_armor') {
+    angleOffset = -Math.PI * 0.75
   }
 
   c.rotate(flightAngle + angleOffset)
@@ -13100,6 +15090,8 @@ function draw() {
   }
 
   if (!isHeadless) {
+    if (typeof drawHitSparks === 'function') drawHitSparks(ctx)
+    if (typeof drawHitFlares === 'function') drawHitFlares(ctx)
     if (typeof drawHitRings === 'function') drawHitRings(ctx)
     if (typeof drawSpriteAnimations === 'function') drawSpriteAnimations(ctx)
   }
@@ -14310,6 +16302,8 @@ function startRunFromSelection() {
   game.playerChillTimer = 0
   game.playerChillSlow = 0
   game.playerFreezeTimer = 0
+  game.playerBlackholeSlowTimer = 0
+  game.playerProjectileGrace = 0
   if (typeof initStageDropTracker === 'function') initStageDropTracker()
   game.spawnTimer = 0
   game.shotTimer = 0
@@ -14353,6 +16347,7 @@ function startRunFromSelection() {
   game.hurtFlash = 0
   game.showFloatingDamage = true
   game.cameraShake = 0
+  game.hitstop = 0
   game._lastShakeTime = 0
   game.hammerRadiusBonus = 0
   game.dingRadiusBonus = 0
@@ -14959,19 +16954,19 @@ const CODEX_DATA = {
       id: 'body_dragon_armor',
       name: '龙鳞霸甲',
       title: '体修起手拳甲 · 真龙金铠',
-      tag: '赤金龙炎贯通',
+      tag: '霸龙金拳贯穿 · 虚影暴风连击',
       icon: '🥋',
       image: './weapon_dragon_armor.png',
-      lore: '真龙坚鳞与玄铁合炼而成的霸道拳甲（装备生命上限 +20）。身前轰出赤金狂暴龙炎，拳心贯穿重伤，边缘掠击扩散递减。',
+      lore: '真龙坚鳞与玄铁合炼而成的霸道拳甲（装备生命上限 +20）。出拳首发霸龙真金实体拳破空贯穿，随后漫天赤金虚影重拳暴风连击持续2秒，每0.25秒造成实体拳头20%的高频连打。',
       stats: [
-        { label: '基础伤害', val: '14' },
+        { label: '实体伤害', val: '14 (100% 贯通)' },
+        { label: '虚影连击', val: '持续 2.0s · 每0.25s 造成 20% 伤害 (共8段)' },
         { label: '附加被动', val: '生命上限 +20' },
-        { label: '攻击频率', val: '1.2 次/秒 (0.85s)' },
-        { label: '龙炎射程', val: '115 px 冲拳轨迹' },
-        { label: '攻击模式', val: '赤金龙炎前冲 · 拳心穿透' }
+        { label: '攻击射程', val: '115 px 冲拳通道' },
+        { label: '攻击模式', val: '首发实体拳 · 漫天虚影暴风连拳' }
       ],
-      upgrade: '延长龙炎冲拳喷涌长度与穿透威力。',
-      tactics: '出拳迅捷，龙炎轨迹穿透多个敌怪，提供可观的生命提升与贴脸强击。'
+      upgrade: '提升拳劲射程与虚影拳暴风打击覆盖范围。',
+      tactics: '首发实体拳击穿近身强敌，随后的漫天虚影暴风连拳可在2秒内持续绞杀范围内成群妖魔。'
     },
     {
       id: 'body_hammer',
@@ -15690,15 +17685,15 @@ const CODEX_DATA = {
       title: '元婴境领主 · 虚空真魔',
       tag: '元婴领主',
       icon: '👹',
-      lore: '撕裂域外虚空降临凡界的元神巨魔，吞纳万千修士精魂。三头六臂，魔气滔天，擅使空间崩塌与魔魂弹幕。修士破丹成婴之时，天魔必降夺其元神。',
+      lore: '撕裂域外虚空降临凡界的元神巨魔，吞纳万千修士精魂。三头六臂，魔气滔天，擅使空间崩塌、噬魂黑洞与灭世神光。修士破丹成婴之时，天魔必降夺其元神。',
       stats: [
         { label: '境界归属', val: '元婴期 (大境界突破遭遇)' },
-        { label: '领主血量', val: '2800 / 3600 / 4400 (分3阶段)' },
-        { label: '近战突刺', val: '修罗破虚闪 (瞬移强袭)' },
-        { label: '弹幕法术', val: '天魔噬魂弹 (微追踪骷髅弹)' },
-        { label: '范围法阵', val: '虚空塌陷 (全屏黑洞强引力场)' }
+        { label: '领主血量', val: '18000 / 26000 / 36000 (分3阶段)' },
+        { label: '一阶噬魂', val: '天魔噬魂弹 (高智能追踪怨魂)' },
+        { label: '二阶黑洞', val: '噬魂黑洞 (强牵引减速与超时毁灭引爆)' },
+        { label: '三阶极光', val: '六极崩灭 (全屏6道缓慢旋转灭世神光)' }
       ],
-      tactics: '拥有罕见的三阶段终极形态演进！三阶段进入终焉狂化，全屏暗紫变幻，弹幕与冲锋频率极大提高，必须依赖高等级防御与极品法宝爆发击杀。'
+      tactics: '三阶段拥有全屏6道顺时针/逆时针缓慢旋转的毁灭激光，道友需跟随激光夹角走位同步旋转；同时魔尊仍会并发前两阶段的噬魂追踪与黑洞吸附，切记不可在黑洞核心内停留！'
     },
     {
       id: 'celestial_peng',
@@ -16059,6 +18054,10 @@ function spawnDummyCluster(count = 16, radius = 120, kind = 'straw') {
 function clearTestDummies() {
   game.enemies = [];
   game.markers = [];
+  if (game.boss || game.isBossStage) {
+    if (typeof stopBossStage === 'function') stopBossStage();
+    if (typeof ui !== 'undefined' && ui.timer) ui.timer.textContent = '演武场';
+  }
 }
 
 function resetDummyPositions() {
@@ -16069,6 +18068,91 @@ function resetDummyPositions() {
   } else {
     spawnTestDummy('immortal', ARENA_WIDTH / 2 + 130, ARENA_HEIGHT / 2);
   }
+}
+
+function spawnTestBoss(bossIdOrConfig = 'asura_demon', phaseIndex = 0) {
+  // 1. 若当前已有领主或弹幕法阵，先平稳清除
+  if (game.boss || game.isBossStage) {
+    if (typeof stopBossStage === 'function') stopBossStage();
+  }
+  game.enemies = game.enemies.filter(e => !e.isBoss && !e.isBossPart);
+  game.bossProjectiles = [];
+  game.bossAoEs = [];
+
+  // 2. 匹配领主配置
+  let config = null;
+  if (typeof bossIdOrConfig === 'string') {
+    config = BOSS_CONFIGS[bossIdOrConfig] || BOSS_CONFIGS.asura_demon;
+  } else if (bossIdOrConfig && typeof bossIdOrConfig === 'object') {
+    config = bossIdOrConfig;
+  } else {
+    config = BOSS_CONFIGS.asura_demon;
+  }
+
+  // 3. 产生领主
+  const boss = spawnBoss(config);
+  if (!boss) return null;
+
+  // 演武试炼中避免漫长入场动画，立即可受击与开始行动
+  boss.state = 'idle';
+  boss.entranceTimer = 0;
+  boss.invuln = false;
+
+  // 4. 多阶段直接指定
+  const maxPhase = Math.max(0, (config.phases ? config.phases.length : 1) - 1);
+  const targetPhaseIdx = Math.max(0, Math.min(maxPhase, Math.floor(phaseIndex || 0)));
+  if (targetPhaseIdx > 0 && config.phases && config.phases[targetPhaseIdx]) {
+    boss.phaseIndex = targetPhaseIdx;
+    boss.currentPhase = config.phases[targetPhaseIdx];
+    const targetHp = isHeadless ? 150 : boss.currentPhase.hp;
+    boss.hp = targetHp;
+    boss.maxHp = targetHp;
+    boss.lagHp = targetHp;
+    boss.speed = boss.currentPhase.speed;
+    boss.damage = boss.currentPhase.damage;
+    boss.rushSpeed = boss.currentPhase.rushSpeed;
+    boss.maxTelegraph = boss.currentPhase.telegraphTime;
+
+    // 幽冥白骨尸皇特殊二阶段初始化
+    if (boss.id === 'corpse_emperor' && targetPhaseIdx === 1) {
+      boss.r = 52;
+      boss.isBerserk = false;
+      if (typeof SpriteSheetAnimation !== 'undefined' && bossCorpseTriSkullSheetImg) {
+        boss.sheetAnim = new SpriteSheetAnimation({
+          img: bossCorpseTriSkullSheetImg,
+          frameW: 180,
+          frameH: 180,
+          cols: 4,
+          rows: 2,
+          totalFrames: 8,
+          fps: 9,
+          loop: true
+        });
+      }
+      initCorpseEmperorArms(boss, 1);
+    } else if (boss.id === 'asura_demon') {
+      initAsuraDemon(boss, targetPhaseIdx);
+    }
+
+    // 同步到 game.enemies 中对应的领主实体
+    const bossEnemy = game.enemies.find(e => e.isBoss);
+    if (bossEnemy) {
+      bossEnemy.hp = boss.hp;
+      bossEnemy.maxHp = boss.maxHp;
+      bossEnemy.speed = boss.speed;
+      bossEnemy.damage = boss.damage;
+      bossEnemy.r = boss.r;
+    }
+  }
+
+  // 5. 刷新顶置血条
+  updateBossHudUI();
+  if (typeof ui !== 'undefined' && ui.timer) {
+    ui.timer.textContent = '演武场';
+  }
+
+  addLog(`【演武领主】秘境领主「${boss.name}」(${boss.currentPhase.name}) 已就位！`, true);
+  return boss;
 }
 
 function drawTrainingDummy(ctx, dummy) {
@@ -16430,6 +18514,7 @@ function startTestLevel(config = {}) {
   game.playerChillTimer = 0;
   game.playerChillSlow = 0;
   game.playerFreezeTimer = 0;
+  game.playerBlackholeSlowTimer = 0;
 
   game.spawnTimer = game.testAutoSpawn ? 0 : 999999;
   game.shotTimer = 0;
@@ -16477,6 +18562,7 @@ function startTestLevel(config = {}) {
   game.hurtFlash = 0;
   game.showFloatingDamage = true;
   game.cameraShake = 0;
+  game.hitstop = 0;
   game._lastShakeTime = 0;
 
   game.chainArcLevel = 0;
@@ -16540,6 +18626,9 @@ function startTestLevel(config = {}) {
 
 function exitTestLevel() {
   game.isTestLevel = false;
+  if (game.boss || game.isBossStage) {
+    if (typeof stopBossStage === 'function') stopBossStage();
+  }
   const testToolbar = document.querySelector('#test-hud-toolbar');
   if (testToolbar) testToolbar.classList.add('hidden');
   closeModal('modal-test-panel');
@@ -16926,9 +19015,160 @@ function renderTestPanelTab(tabName = 'weapons') {
 
   } else if (tabName === 'dummies') {
     const dummyCount = game.enemies.filter(e => e.isDummy).length;
-    const monsterCount = game.enemies.filter(e => !e.isDummy && !e.isBoss).length;
+    const monsterCount = game.enemies.filter(e => !e.isDummy && !e.isBoss && !e.isBossPart).length;
+    const activeBoss = (game.isBossStage && game.boss) ? game.boss : null;
+
+    let activeBossBanner = '';
+    if (activeBoss) {
+      activeBossBanner = `
+        <div style="background:radial-gradient(ellipse at left, rgba(114,9,183,0.3), rgba(20,28,36,0.85)); border:1px solid rgba(247,37,133,0.55); border-radius:8px; padding:10px 14px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 4px 16px rgba(0,0,0,0.4);">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font-size:22px;">👹</span>
+            <div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <b style="color:#fffae0; font-size:14px;">${activeBoss.title}「${activeBoss.name}」</b>
+                <span style="font-size:10px; color:#ffd875; background:rgba(212,175,55,0.2); padding:1px 6px; border-radius:4px; border:1px solid rgba(212,175,55,0.4);">阶段 ${activeBoss.phaseIndex + 1}/${activeBoss.config.phases.length}</span>
+              </div>
+              <div style="font-size:11px; color:#a4beba; margin-top:2px;">
+                当前心法：<span style="color:#06d6a0;">${activeBoss.currentPhase.name}</span> · 气血：<span style="color:#f87171; font-family:monospace;">${Math.round(activeBoss.hp)} / ${activeBoss.maxHp}</span>
+              </div>
+            </div>
+          </div>
+          <button class="test-btn danger" data-act="dismiss-boss" style="padding:5px 12px; font-size:11px;">❌ 遣返领主</button>
+        </div>
+      `;
+    }
 
     body.innerHTML = `
+      ${activeBossBanner}
+      <!-- 领主实战测试专区 -->
+      <div class="test-section-box">
+        <div class="test-section-title">
+          <span>👹 秘境领主对决演练（五大境界领主 · 各阶段机制直测）</span>
+          <span style="font-size:11px;color:#a4beba;">单场仅驻留一位领主 · 击杀不中断演武</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:10px;">
+          <!-- 1. 九天噬魂魔尊 -->
+          <div style="background:rgba(12,20,26,0.65); padding:10px 12px; border-radius:8px; border:1px solid ${activeBoss?.id === 'asura_demon' ? 'rgba(247,37,133,0.7)' : 'rgba(114,9,183,0.35)'}; display:flex; flex-direction:column; gap:8px; box-shadow:${activeBoss?.id === 'asura_demon' ? '0 0 12px rgba(114,9,183,0.4)' : 'none'};">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:16px;">👹</span>
+                <b style="color:#f72585; font-size:13px;">【元婴领主】九天噬魂魔尊</b>
+                <span style="font-size:10px; color:#d4af37; background:rgba(114,9,183,0.25); padding:1px 6px; border-radius:4px; border:1px solid rgba(247,37,133,0.4);">元婴境 · 虚空真魔</span>
+              </div>
+              <span style="font-size:11px; color:#8da49d;">三头六臂 · 噬魂追踪 / 黑洞引力 / 六极旋转激光</span>
+            </div>
+            <div style="font-size:11px; color:#8da49d; line-height:1.4;">
+              撕裂虚空的元神巨魔。一阶发射高智能噬魂追踪弹；二阶施放减速吸附黑洞与毁灭爆炸；三阶全屏6道缓慢旋转灭世神光！
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <button class="test-btn danger" data-act="spawn-boss-phase" data-boss="asura_demon" data-phase="0" title="一阶：天魔初醒 · 高智力噬魂鬼面追踪弹">
+                召一阶 · 噬魂追踪
+              </button>
+              <button class="test-btn danger" data-act="spawn-boss-phase" data-boss="asura_demon" data-phase="1" title="二阶：虚空引力 · 噬魂黑洞减速吸附与引爆">
+                召二阶 · 噬魂黑洞
+              </button>
+              <button class="test-btn" data-act="spawn-boss-phase" data-boss="asura_demon" data-phase="2" style="background:#7209b7; color:#fff; border-color:#f72585;" title="三阶：六极崩灭 · 全屏6道旋转灭世神光 + 噬魂黑洞并发">
+                召三阶 · 六极极光 (终焉狂暴)
+              </button>
+            </div>
+          </div>
+
+          <!-- 2. 幽冥白骨尸皇 -->
+          <div style="background:rgba(12,20,26,0.65); padding:10px 12px; border-radius:8px; border:1px solid ${activeBoss?.id === 'corpse_emperor' ? 'rgba(6,214,160,0.7)' : 'rgba(6,214,160,0.3)'}; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:16px;">💀</span>
+                <b style="color:#06d6a0; font-size:13px;">【结丹领主】幽冥白骨尸皇</b>
+                <span style="font-size:10px; color:#06d6a0; background:rgba(6,214,160,0.15); padding:1px 6px; border-radius:4px; border:1px solid rgba(6,214,160,0.3);">结丹境 · 幽冥玄煞</span>
+              </div>
+              <span style="font-size:11px; color:#8da49d;">多部位骨架 · 骨盾减伤 / 万骨拍击 / 极寒鬼火</span>
+            </div>
+            <div style="font-size:11px; color:#8da49d; line-height:1.4;">
+              上古魔骨暴君。一阶双骨盾提供90%减伤庇护与指节魔弹；二阶三首融合+六臂狂暴拍击、极寒鬼火与狂暴冲撞！
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <button class="test-btn" data-act="spawn-boss-phase" data-boss="corpse_emperor" data-phase="0" style="background:#059669; color:#fff; border-color:#06d6a0;">
+                召一阶 · 双骨镇煞 (骨盾庇护)
+              </button>
+              <button class="test-btn" data-act="spawn-boss-phase" data-boss="corpse_emperor" data-phase="1" style="background:#047857; color:#fff; border-color:#06d6a0;">
+                召二阶 · 六臂狂怒 (三首狂骨)
+              </button>
+            </div>
+          </div>
+
+          <!-- 3. 千年赤炼蛟 -->
+          <div style="background:rgba(12,20,26,0.65); padding:10px 12px; border-radius:8px; border:1px solid ${activeBoss?.id === 'red_dragon' ? 'rgba(230,57,70,0.7)' : 'rgba(230,57,70,0.3)'}; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:16px;">🐉</span>
+                <b style="color:#f87171; font-size:13px;">【筑基领主】千年赤炼蛟</b>
+                <span style="font-size:10px; color:#f87171; background:rgba(230,57,70,0.15); padding:1px 6px; border-radius:4px; border:1px solid rgba(230,57,70,0.3);">筑基境 · 赤焰火煞</span>
+              </div>
+              <span style="font-size:11px; color:#8da49d;">地心蛟龙 · 熔岩喷涌 / 双重狂暴冲锋</span>
+            </div>
+            <div style="font-size:11px; color:#8da49d; line-height:1.4;">
+              潜修千年的火煞恶蛟。一阶游龙翻江喷吐熔岩地火与火球；二阶焚天狂暴双重高速连续冲拳与大范围熔岩火毒！
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <button class="test-btn warning" data-act="spawn-boss-phase" data-boss="red_dragon" data-phase="0">
+                召一阶 · 游龙翻江
+              </button>
+              <button class="test-btn warning" data-act="spawn-boss-phase" data-boss="red_dragon" data-phase="1">
+                召二阶 · 焚天狂暴
+              </button>
+            </div>
+          </div>
+
+          <!-- 4. 巡天金翅大鹏 -->
+          <div style="background:rgba(12,20,26,0.65); padding:10px 12px; border-radius:8px; border:1px solid ${activeBoss?.id === 'celestial_peng' ? 'rgba(255,183,3,0.7)' : 'rgba(255,183,3,0.3)'}; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:16px;">🦅</span>
+                <b style="color:#fbbf24; font-size:13px;">【化神领主】巡天金翅大鹏</b>
+                <span style="font-size:10px; color:#fbbf24; background:rgba(255,183,3,0.15); padding:1px 6px; border-radius:4px; border:1px solid rgba(255,183,3,0.3);">化神境 · 太古神禽</span>
+              </div>
+              <span style="font-size:11px; color:#8da49d;">神禽羽刃 · 金芒神雷 / 太乙狂暴龙卷</span>
+            </div>
+            <div style="font-size:11px; color:#8da49d; line-height:1.4;">
+              抟扶摇九万里的太古神禽。一阶金羽雷霆破空呼啸；二阶极速搏龙冲锋与全屏撕裂的太乙风暴龙卷！
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <button class="test-btn amber" data-act="spawn-boss-phase" data-boss="celestial_peng" data-phase="0">
+                召一阶 · 扶摇九霄
+              </button>
+              <button class="test-btn amber" data-act="spawn-boss-phase" data-boss="celestial_peng" data-phase="1">
+                召二阶 · 大鹏搏龙
+              </button>
+            </div>
+          </div>
+
+          <!-- 5. 混沌太虚道祖 -->
+          <div style="background:rgba(12,20,26,0.65); padding:10px 12px; border-radius:8px; border:1px solid ${activeBoss?.id === 'primordial_god' ? 'rgba(76,201,240,0.7)' : 'rgba(76,201,240,0.3)'}; display:flex; flex-direction:column; gap:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:16px;">🌌</span>
+                <b style="color:#38bdf8; font-size:13px;">【终极领主】混沌太虚道祖</b>
+                <span style="font-size:10px; color:#38bdf8; background:rgba(76,201,240,0.15); padding:1px 6px; border-radius:4px; border:1px solid rgba(76,201,240,0.3);">飞升劫 · 天道化身</span>
+              </div>
+              <span style="font-size:11px; color:#8da49d;">天道至尊 · 阴阳玄极 / 诸天星陨 / 奇点黑洞</span>
+            </div>
+            <div style="font-size:11px; color:#8da49d; line-height:1.4;">
+              执掌万界天道本源！一阶阴阳玄极法阵与阴阳混沌法球；二阶引动九天玄刹诸天星陨与奇点塌陷！
+            </div>
+            <div style="display:flex; flex-wrap:wrap; gap:8px;">
+              <button class="test-btn" data-act="spawn-boss-phase" data-boss="primordial_god" data-phase="0" style="background:#0284c7; color:#fff; border-color:#38bdf8;">
+                召一阶 · 混沌初开
+              </button>
+              <button class="test-btn" data-act="spawn-boss-phase" data-boss="primordial_god" data-phase="1" style="background:#2563eb; color:#fff; border-color:#38bdf8;">
+                召二阶 · 九天玄刹
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 木桩与靶标专区 -->
       <div class="test-section-box">
         <div class="test-section-title">
           <span>🪵 演武场靶标与木桩召唤</span>
@@ -16978,24 +19218,6 @@ function renderTestPanelTab(tabName = 'weapons') {
               <div style="font-size:11px; color:#8da49d; margin-top:2px;">移动攻击的真实小怪，测试实战击退与走位</div>
             </div>
             <button class="test-btn" data-act="spawn-monsters">召唤妖群</button>
-          </div>
-
-          <!-- 测试领主 (赤炼蛟) -->
-          <div style="background:rgba(12,20,26,0.6); padding:10px 12px; border-radius:6px; border:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <b style="color:#f87171; font-size:13px;">👹 领主木桩 (赤炼蛟)</b>
-              <div style="font-size:11px; color:#8da49d; margin-top:2px;">召唤秘境领主进行血量削减与机制测试</div>
-            </div>
-            <button class="test-btn danger" data-act="spawn-boss">召唤蛟龙</button>
-          </div>
-
-          <!-- 测试领主 (白骨尸皇) -->
-          <div style="background:rgba(12,20,26,0.6); padding:10px 12px; border-radius:6px; border:1px solid rgba(6,214,160,0.25); display:flex; justify-content:space-between; align-items:center;">
-            <div>
-              <b style="color:#06d6a0; font-size:13px;">💀 【领主】幽冥白骨尸皇</b>
-              <div style="font-size:11px; color:#8da49d; margin-top:2px;">分散多部位领主：一阶神颅+双臂(骨盾90%减伤+指节弹幕)；二阶三首狂骨+六臂(拍击/鬼火/狂暴冲撞)</div>
-            </div>
-            <button class="test-btn primary" data-act="spawn-corpse-emperor" style="background:#059669; color:#fff; border-color:#06d6a0;">召唤尸皇</button>
           </div>
 
           <!-- 测试精英怪 (赤炼熔岩巨兕) -->
@@ -17060,16 +19282,18 @@ function renderTestPanelTab(tabName = 'weapons') {
         } else if (act === 'spawn-elite-frost-brute') {
           createEnemy('elite_frost_brute', game.player.x + 160, game.player.y);
           addLog('【精英】玄霜凝晶巨兕已降临演武场！', true);
+        } else if (act === 'spawn-boss-phase') {
+          const bossId = btn.dataset.boss;
+          const phase = parseInt(btn.dataset.phase, 10) || 0;
+          spawnTestBoss(bossId, phase);
+        } else if (act === 'dismiss-boss') {
+          if (typeof stopBossStage === 'function') stopBossStage();
+          if (typeof ui !== 'undefined' && ui.timer) ui.timer.textContent = '演武场';
+          addLog('已遣返场上秘境领主。', true);
         } else if (act === 'spawn-boss') {
-          if (!game.enemies.some(e => e.isBoss)) {
-            spawnBoss('red_dragon', 1);
-            addLog('领主【千年赤炼蛟】已降临演武场！', true);
-          }
+          spawnTestBoss('red_dragon', 1);
         } else if (act === 'spawn-corpse-emperor') {
-          if (!game.enemies.some(e => e.isBoss)) {
-            spawnBoss(BOSS_CONFIGS.corpse_emperor);
-            addLog('领主【幽冥白骨尸皇】已降临演武场！', true);
-          }
+          spawnTestBoss('corpse_emperor', 0);
         }
         renderTestPanelTab('dummies');
       });
@@ -17225,6 +19449,10 @@ function bindTestLevelHUD() {
     spawnDummyCluster(16, 120, 'straw');
     addLog('已在周围召唤 16 只【易爆草人】。', true);
   });
+  document.querySelector('#test-hud-btn-boss')?.addEventListener('click', () => {
+    sound.click();
+    openTestPanel('dummies');
+  });
   document.querySelector('#test-hud-btn-clear')?.addEventListener('click', () => {
     sound.click();
     clearTestDummies();
@@ -17284,6 +19512,10 @@ bindTestLevelHUD();
 if (typeof window !== 'undefined') {
   window.__gameControls = {
     game,
+    sound,
+    drawHitSparks,
+    drawHitFlares,
+    drawHitRings,
     confirmSettlement,
     startRunFromSelection,
     shoot,
@@ -17348,6 +19580,7 @@ if (typeof window !== 'undefined') {
     exitTestLevel,
     spawnTestDummy,
     spawnDummyCluster,
+    spawnTestBoss,
     clearTestDummies,
     resetDummyPositions,
     applyTestWeapon,
@@ -17421,6 +19654,28 @@ if (typeof window !== 'undefined') {
     fireCorpseGhostFire,
     fireTriSkullGiantGhostFire,
     updateCorpseEmperor,
+    getAsuraDemonTextures: () => ({
+      get bossImg() { return bossAsuraDemonImg },
+      get bossLoaded() { return bossAsuraDemonLoaded },
+      get sheetImg() { return bossAsuraDemonSheetImg },
+      get sheetLoaded() { return bossAsuraDemonSheetLoaded },
+      get soulImg() { return effectAsuraSoulImg },
+      get soulLoaded() { return effectAsuraSoulLoaded },
+      get blackholeImg() { return effectAsuraBlackholeImg },
+      get blackholeLoaded() { return effectAsuraBlackholeLoaded },
+      setBossLoaded: (v) => { bossAsuraDemonLoaded = v },
+      setSheetLoaded: (v) => { bossAsuraDemonSheetLoaded = v },
+      setSoulLoaded: (v) => { effectAsuraSoulLoaded = v },
+      setBlackholeLoaded: (v) => { effectAsuraBlackholeLoaded = v }
+    }),
+    initAsuraDemon,
+    updateAsuraDemon,
+    updateAsuraHexLasers,
+    checkHexLaserCollision,
+    startAsuraSoulBarrage,
+    fireAsuraSoulBarrage,
+    startAsuraBlackhole,
+    spawnAsuraBlackhole,
     damageEnemy,
     drawBossProjectiles,
     drawBossAoEs,
@@ -17435,7 +19690,10 @@ if (typeof window !== 'undefined') {
     createEnemy,
     fireMagmaBarrage,
     fireFrostCrystalBarrage,
-    updateBossProjectiles
+    updateBossProjectiles,
+    updateBossAoEs,
+    updateBoss,
+    drawBoss
   }
 }
 

@@ -17,9 +17,13 @@ const testFiles = [
   'test_minimal_weapon_slots.mjs',
   'test_enemy_spritesheets.mjs',
   'test_corpse_emperor.mjs',
+  'test_asura_demon.mjs',
   'test_player_weapon_sheets.mjs',
   'test_ding_crush.mjs',
+  'test_dragon_armor_fist.mjs',
   'test_damage_numbers.mjs',
+  'test_all_enemy_damage.mjs',
+  'test_hit_feedback.mjs',
   'verify_asset_paths.mjs'
 ]
 

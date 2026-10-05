@@ -114,7 +114,10 @@ assert(Math.abs(expectMult - 1.12) < 1e-9,
 /* ================= 1. 敌方飘字：默认小号、攻击色 ================= */
 game.damageNumbers.length = 0
 const dummy = { x: 300, y: 200, r: 14, hp: 99999, maxHp: 99999, kind: 'wisp' }
+const origRandom = Math.random
+Math.random = () => 0.99
 gc.damageEnemy(dummy, 12, '#ffd166')
+Math.random = origRandom
 const e1 = last()
 assert(Boolean(e1), '敌方受击产出了飘字')
 assert(e1.kind === 'enemy', `默认按敌方受击呈现（kind=${e1.kind}）`)

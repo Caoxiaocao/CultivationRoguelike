@@ -276,8 +276,51 @@ assert(true, '木桩靶标标签页 (dummies) 渲染正常')
 gc.renderTestPanelTab('stats')
 assert(true, '统计面板标签页 (stats) 渲染正常')
 
-// 10. 退出演武场回归主界面测试
-console.log('\n--- 10. 退出演武场回归主界面测试 ---')
+// 10. 演武试炼秘境领主专属召唤与多阶段测试
+console.log('\n--- 10. 秘境领主演练召唤与多阶段机制直测 ---')
+assert(typeof gc.spawnTestBoss === 'function', 'spawnTestBoss 函数已成功导出')
+
+// 10.1 召唤九天噬魂魔尊一阶段
+const asuraP0 = gc.spawnTestBoss('asura_demon', 0)
+assert(gc.game.isBossStage === true, '演武场已开启领主战状态')
+assert(gc.game.boss && gc.game.boss.id === 'asura_demon', '成功召唤【九天噬魂魔尊】')
+assert(gc.game.boss.phaseIndex === 0, '魔尊处于第 1 阶段 (天魔初醒 · 噬魂追踪)')
+assert(gc.game.enemies.some(e => e.isBoss), 'game.enemies 中已注册领主目标')
+
+// 10.2 切换至九天噬魂魔尊二阶段 (黑洞吸附)
+const asuraP1 = gc.spawnTestBoss('asura_demon', 1)
+assert(gc.game.boss.phaseIndex === 1, '魔尊切换为第 2 阶段 (虚空引力 · 噬魂黑洞)')
+assert(gc.game.boss.currentPhase.blackhole === true, '二阶段黑洞配置生效')
+
+// 10.3 切换至九天噬魂魔尊三阶段 (六极旋转灭世神光)
+const asuraP2 = gc.spawnTestBoss('asura_demon', 2)
+assert(gc.game.boss.phaseIndex === 2, '魔尊切换为第 3 阶段 (六极崩灭 · 终焉天魔)')
+assert(gc.game.boss.currentPhase.hexLaser === true, '三阶段六极激光配置生效')
+assert(gc.game.boss.laserRotateSpeed > 0 && gc.game.boss.laserMaxTimer === 6.0, '魔尊已初始化六极旋转激光参数')
+
+// 10.4 召唤幽冥白骨尸皇二阶段 (六臂狂怒)
+const corpseP1 = gc.spawnTestBoss('corpse_emperor', 1)
+assert(gc.game.boss && gc.game.boss.id === 'corpse_emperor', '成功召唤【幽冥白骨尸皇】')
+assert(gc.game.boss.phaseIndex === 1, '尸皇处于第 2 阶段 (六臂狂怒)')
+assert(gc.game.boss.arms && gc.game.boss.arms.length === 6, '尸皇已初始化6只骨臂')
+assert(gc.game.enemies.filter(e => e.isBossPart).length === 6, 'game.enemies 中已注册 6 只骨臂实体')
+
+// 10.5 演武场击败领主平稳保留演武状态
+gc.defeatBoss()
+assert(gc.game.boss === null, '击败领主后 boss 引用已清理')
+assert(gc.game.isBossStage === false, '领主战状态已重置')
+assert(gc.game.isTestLevel === true, '击败领主后玩家依然留在演武试炼中 (未触发通关退场)')
+assert(getEl('#boss-hud-bar')._classes.has('hidden'), '击败领主后领主血条已隐藏')
+
+// 10.6 召唤领主后一键清屏
+gc.spawnTestBoss('celestial_peng', 0)
+assert(gc.game.boss && gc.game.boss.id === 'celestial_peng', '成功召唤【巡天金翅大鹏】')
+gc.clearTestDummies()
+assert(gc.game.boss === null && gc.game.isBossStage === false, '清屏后成功彻底清理领主')
+assert(gc.game.enemies.length === 0, '清屏后全场敌人为 0')
+
+// 11. 退出演武场回归主界面测试
+console.log('\n--- 11. 退出演武场回归主界面测试 ---')
 gc.exitTestLevel()
 assert(gc.game.isTestLevel === false, '已退出演武场 (isTestLevel = false)')
 
