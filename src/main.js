@@ -251,6 +251,19 @@ app.innerHTML = `<div class="app-shell">
             </div>
           </div>
           <div class="settings-row">
+            <span>战意配乐 (BGM)</span>
+            <div class="settings-ctrl">
+              <button class="modal-btn" id="bgm-toggle"><span id="bgm-icon">🎵</span> <span id="bgm-text">开启</span></button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <span>战意配乐音量</span>
+            <div class="settings-ctrl">
+              <input type="range" min="0" max="100" value="50" class="volume-slider" id="bgm-slider">
+              <span id="bgm-value" style="font-size:12px;color:#dfc475;min-width:38px;">50%</span>
+            </div>
+          </div>
+          <div class="settings-row">
             <span>道音主音量</span>
             <div class="settings-ctrl">
               <input type="range" min="0" max="150" value="100" class="volume-slider" id="volume-slider">
@@ -550,6 +563,11 @@ ui.arena = ui.arenaRealm;
 ui.soundToggle = document.querySelector('#sound-toggle');
 ui.soundIcon = document.querySelector('#sound-icon');
 ui.soundText = document.querySelector('#sound-text');
+ui.bgmToggle = document.querySelector('#bgm-toggle');
+ui.bgmIcon = document.querySelector('#bgm-icon');
+ui.bgmText = document.querySelector('#bgm-text');
+ui.bgmSlider = document.querySelector('#bgm-slider');
+ui.bgmValue = document.querySelector('#bgm-value');
 
 const sound = {
   enabled: true,
@@ -557,6 +575,21 @@ const sound = {
   ctx: null,
   masterGain: null,
   limiter: null,
+  whiteNoiseBuffer: null,
+  pinkNoiseBuffer: null,
+
+  // 状态追踪字段（完全兼容现有自动化测试）
+  _lastHitRecord: null,
+  _lastPlayerHurt: null,
+  _lastEnemyShoot: null,
+  _lastEnemyShootTimes: null,
+  _lastEnemySlam: null,
+  _lastEnemyAoE: null,
+  _lastBlazingBurst: null,
+  _lastDefeatSound: null,
+  _lastPlayerHurtSound: null,
+  _lastHitEnemyTime: null,
+
   init() {
     if (this.ctx) return
     const AudioCtx = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)
@@ -566,25 +599,75 @@ const sound = {
         this.masterGain = this.ctx.createGain()
         this.masterGain.gain.setValueAtTime(this.volume, this.ctx.currentTime)
 
-        this.limiter = this.ctx.createDynamicsCompressor()
-        this.limiter.threshold.setValueAtTime(-3, this.ctx.currentTime)
-        this.limiter.knee.setValueAtTime(4, this.ctx.currentTime)
-        this.limiter.ratio.setValueAtTime(12, this.ctx.currentTime)
-        this.limiter.attack.setValueAtTime(0.003, this.ctx.currentTime)
-        this.limiter.release.setValueAtTime(0.15, this.ctx.currentTime)
+        // 主动态压缩/防爆音压限器 (Dynamics Compressor & Hard Limiter)
+        if (this.ctx.createDynamicsCompressor) {
+          try {
+            this.limiter = this.ctx.createDynamicsCompressor()
+            if (this.limiter.threshold) this.limiter.threshold.setValueAtTime(-2.5, this.ctx.currentTime)
+            if (this.limiter.knee) this.limiter.knee.setValueAtTime(4, this.ctx.currentTime)
+            if (this.limiter.ratio) this.limiter.ratio.setValueAtTime(14, this.ctx.currentTime)
+            if (this.limiter.attack) this.limiter.attack.setValueAtTime(0.002, this.ctx.currentTime)
+            if (this.limiter.release) this.limiter.release.setValueAtTime(0.12, this.ctx.currentTime)
+            this.masterGain.connect(this.limiter)
+            this.limiter.connect(this.ctx.destination)
+          } catch (_) {
+            this.masterGain.connect(this.ctx.destination)
+          }
+        } else {
+          this.masterGain.connect(this.ctx.destination)
+        }
 
-        this.masterGain.connect(this.limiter)
-        this.limiter.connect(this.ctx.destination)
+        // 初始化白噪与粉噪专用 AudioBuffer（用于真实破空、雷火与气流）
+        this._initNoiseBuffers()
+
+        // 初始化战意背景音乐引擎
+        if (this.bgm && typeof this.bgm.init === 'function') {
+          this.bgm.init(this.ctx, this.masterGain)
+        }
       } catch (e) {
         console.warn('AudioContext init failed', e)
       }
     }
   },
+
+  _initNoiseBuffers() {
+    if (!this.ctx || !this.ctx.createBuffer) return
+    try {
+      const sampleRate = this.ctx.sampleRate || 44100
+      const duration = 2.0
+      const bufferSize = Math.floor(sampleRate * duration)
+
+      // 1. 白噪声 (White Noise: 富高频，用于刀剑斩风、电弧火花、金属碰撞瞬态)
+      this.whiteNoiseBuffer = this.ctx.createBuffer(1, bufferSize, sampleRate)
+      const wData = this.whiteNoiseBuffer.getChannelData(0)
+      for (let i = 0; i < bufferSize; i++) {
+        wData[i] = Math.random() * 2 - 1
+      }
+
+      // 2. 粉红噪声 (Pink Noise: Voss-McCartney算法，低频饱满，用于烈焰呼啸、狂风与雷暴地鸣)
+      this.pinkNoiseBuffer = this.ctx.createBuffer(1, bufferSize, sampleRate)
+      const pData = this.pinkNoiseBuffer.getChannelData(0)
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1
+        b0 = 0.99886 * b0 + white * 0.0555179
+        b1 = 0.99332 * b1 + white * 0.0750759
+        b2 = 0.96900 * b2 + white * 0.1538520
+        b3 = 0.86650 * b3 + white * 0.3104856
+        b4 = 0.55000 * b4 + white * 0.5329522
+        b5 = -0.7616 * b5 - white * 0.0168980
+        pData[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.11
+        b6 = white * 0.115926
+      }
+    } catch (_) {}
+  },
+
   resume() {
     if (this.ctx && this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {})
     }
   },
+
   setVolume(val) {
     this.volume = Math.max(0, Math.min(1.5, Number(val) || 0))
     if (this.masterGain && this.ctx) {
@@ -592,10 +675,18 @@ const sound = {
       this.masterGain.gain.linearRampToValueAtTime(this.volume, this.ctx.currentTime + 0.05)
     }
   },
+
   toggle() {
     this.enabled = !this.enabled
+    if (!this.enabled && this.bgm) {
+      this.bgm.pause()
+    } else if (this.enabled && this.bgm && this.bgm.enabled && typeof game !== 'undefined' && game.screen === 'game' && !game.paused && !game.gameOver) {
+      this.bgm.play()
+    }
     return this.enabled
   },
+
+  // 基础原生单音（保持 100% 向上兼容）
   playTone(freq, type = 'sine', duration = 0.1, gainVal = 0.3, slideTo = null) {
     if (!this.enabled || isHeadless) return
     this.init()
@@ -613,7 +704,7 @@ const sound = {
         osc.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), t + duration)
       }
 
-      gain.gain.setValueAtTime(Math.max(0.001, gainVal), t)
+      gain.gain.setValueAtTime(Math.max(0.001, gainVal * this.volume), t)
       gain.gain.exponentialRampToValueAtTime(0.0001, t + duration)
 
       osc.connect(gain)
@@ -623,12 +714,101 @@ const sound = {
       osc.stop(t + duration)
     } catch (e) {}
   },
-  shoot() {
-    this.playTone(880, 'triangle', 0.12, 0.45, 240)
+
+  // 高保真噪声滤波生成器 (Noise + BiquadFilter Envelope)
+  playNoise(type = 'white', duration = 0.1, filterType = 'bandpass', startFreq = 2000, endFreq = 500, gainVal = 0.3, Q = 1.0) {
+    if (!this.enabled || isHeadless) return
+    this.init()
+    this.resume()
+    if (!this.ctx || !this.masterGain) return
+
+    const buffer = type === 'pink' ? this.pinkNoiseBuffer : this.whiteNoiseBuffer
+    if (!buffer || !this.ctx.createBufferSource) {
+      this.playTone(startFreq, 'sawtooth', duration, gainVal * 0.5, endFreq)
+      return
+    }
+
+    try {
+      const t = this.ctx.currentTime
+      const src = this.ctx.createBufferSource()
+      src.buffer = buffer
+
+      const gain = this.ctx.createGain()
+      gain.gain.setValueAtTime(Math.max(0.0001, gainVal * this.volume), t)
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + duration)
+
+      if (this.ctx.createBiquadFilter) {
+        const filter = this.ctx.createBiquadFilter()
+        filter.type = filterType
+        filter.Q.setValueAtTime(Q, t)
+        filter.frequency.setValueAtTime(Math.max(20, startFreq), t)
+        if (endFreq && endFreq !== startFreq) {
+          filter.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), t + duration)
+        }
+        src.connect(filter)
+        filter.connect(gain)
+      } else {
+        src.connect(gain)
+      }
+
+      gain.connect(this.masterGain)
+      src.start(t)
+      src.stop(t + duration)
+    } catch (e) {}
   },
+
+  // 1. 玩家武器出招与法宝破空音效 (根据武器属性分层定制)
+  shoot(weaponType = 'sword') {
+    if (!this.enabled || isHeadless) return
+    this.init()
+    this.resume()
+    if (!this.ctx || !this.masterGain) return
+
+    const pitchVar = 0.94 + Math.random() * 0.12
+    if (weaponType === 'thunder_sword' || weaponType === 'thunder') {
+      // 奔雷飞剑：电弧击穿空气 + 剑风
+      this.playNoise('white', 0.07, 'highpass', 3200 * pitchVar, 1200, 0.35, 2.0)
+      this.playTone(520 * pitchVar, 'sawtooth', 0.12, 0.38, 140 * pitchVar)
+    } else if (weaponType === 'daggers') {
+      // 翡翠双刃：双刀轻疾撕裂风声
+      this.playNoise('white', 0.05, 'bandpass', 4200 * pitchVar, 1600, 0.28, 3.5)
+      this.playTone(1520 * pitchVar, 'sine', 0.06, 0.24, 720 * pitchVar)
+    } else if (weaponType === 'hammer') {
+      // 撼地神锤：厚重风阻低沉掠空
+      this.playNoise('pink', 0.16, 'lowpass', 650 * pitchVar, 120, 0.44, 1.2)
+      this.playTone(140 * pitchVar, 'triangle', 0.18, 0.48, 45)
+    } else if (weaponType === 'ding') {
+      // 九疑重鼎：金属旋风起势
+      this.playNoise('pink', 0.18, 'bandpass', 520 * pitchVar, 180, 0.38, 2.5)
+      this.playTone(220 * pitchVar, 'sawtooth', 0.20, 0.42, 60)
+    } else if (weaponType === 'dragon_armor' || weaponType === 'fist') {
+      // 狂龙出海：拳风音爆
+      this.playNoise('pink', 0.12, 'lowpass', 850 * pitchVar, 160, 0.46, 1.5)
+      this.playTone(210 * pitchVar, 'sawtooth', 0.16, 0.52, 55)
+    } else if (weaponType === 'bagua') {
+      // 乾坤道阵：道家法玉轻磬
+      this.playTone(659.25 * pitchVar, 'sine', 0.24, 0.38, 523.25)
+      this.playTone(987.77 * pitchVar, 'sine', 0.18, 0.20, 783.99)
+    } else if (weaponType === 'fuchen') {
+      // 灵木拂尘：丝绸迎风漫扫
+      this.playNoise('white', 0.14, 'bandpass', 1800 * pitchVar, 400, 0.30, 2.0)
+      this.playTone(587.33 * pitchVar, 'triangle', 0.15, 0.28, 330)
+    } else if (weaponType === 'flame' || weaponType === 'fire') {
+      // 三昧真火：烈火喷涌热浪
+      this.playNoise('pink', 0.18, 'bandpass', 1100 * pitchVar, 280, 0.42, 1.8)
+      this.playTone(260 * pitchVar, 'sawtooth', 0.22, 0.45, 75)
+    } else {
+      // 默认青锋飞剑：清冽御剑穿云 (金属啸鸣 + 破空剪风)
+      this.playNoise('white', 0.08, 'bandpass', 2800 * pitchVar, 750, 0.32, 2.8)
+      this.playTone(1680 * pitchVar, 'triangle', 0.09, 0.32, 380 * pitchVar)
+    }
+  },
+
   hit(type = 'bullet') {
     this.playerHurt(type)
   },
+
+  // 2. 玩家受创音效 (真实物理属性击打与元素感)
   playerHurt(hitType = 'bullet') {
     this._lastPlayerHurt = { hitType, time: Date.now() }
     if (!this.enabled || isHeadless) return
@@ -643,82 +823,34 @@ const sound = {
     this._lastPlayerHurtSound = now
 
     try {
-      const t = this.ctx.currentTime
       if (hitType === 'frost') {
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
-        osc.type = 'triangle'
-        osc.frequency.setValueAtTime(860, t)
-        osc.frequency.exponentialRampToValueAtTime(280, t + 0.12)
-        gain.gain.setValueAtTime(0.42 * this.volume, t)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12)
-        osc.connect(gain)
-        gain.connect(this.masterGain)
-        osc.start(t)
-        osc.stop(t + 0.12)
+        // 寒冰碎裂
+        this.playNoise('white', 0.12, 'highpass', 2800, 900, 0.38, 3.0)
+        this.playTone(860, 'triangle', 0.12, 0.42, 280)
       } else if (hitType === 'fire') {
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
-        osc.type = 'sawtooth'
-        osc.frequency.setValueAtTime(320, t)
-        osc.frequency.exponentialRampToValueAtTime(75, t + 0.15)
-        gain.gain.setValueAtTime(0.45 * this.volume, t)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15)
-        osc.connect(gain)
-        gain.connect(this.masterGain)
-        osc.start(t)
-        osc.stop(t + 0.15)
+        // 烈焰灼烧
+        this.playNoise('pink', 0.15, 'bandpass', 1200, 300, 0.45, 1.5)
+        this.playTone(320, 'sawtooth', 0.15, 0.45, 75)
       } else if (hitType === 'heavy' || hitType === 'slam') {
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
-        osc.type = 'sawtooth'
-        osc.frequency.setValueAtTime(115, t)
-        osc.frequency.exponentialRampToValueAtTime(32, t + 0.25)
-        gain.gain.setValueAtTime(0.65 * this.volume, t)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25)
-        osc.connect(gain)
-        gain.connect(this.masterGain)
-        osc.start(t)
-        osc.stop(t + 0.25)
+        // 泰山压顶钝击
+        this.playNoise('pink', 0.22, 'lowpass', 550, 80, 0.55, 1.5)
+        this.playTone(115, 'sawtooth', 0.25, 0.65, 32)
       } else if (hitType === 'explosion') {
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
-        osc.type = 'sawtooth'
-        osc.frequency.setValueAtTime(95, t)
-        osc.frequency.exponentialRampToValueAtTime(24, t + 0.32)
-        gain.gain.setValueAtTime(0.7 * this.volume, t)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32)
-        osc.connect(gain)
-        gain.connect(this.masterGain)
-        osc.start(t)
-        osc.stop(t + 0.32)
+        // 强冲击波殉爆
+        this.playNoise('pink', 0.28, 'lowpass', 900, 100, 0.62, 1.2)
+        this.playTone(95, 'sawtooth', 0.32, 0.70, 24)
       } else if (hitType === 'dot') {
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
-        osc.type = 'sine'
-        osc.frequency.setValueAtTime(360, t)
-        osc.frequency.linearRampToValueAtTime(240, t + 0.05)
-        gain.gain.setValueAtTime(0.18 * this.volume, t)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.05)
-        osc.connect(gain)
-        gain.connect(this.masterGain)
-        osc.start(t)
-        osc.stop(t + 0.05)
+        // 侵蚀低吟
+        this.playTone(360, 'sine', 0.05, 0.18, 240)
       } else {
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
-        osc.type = 'sawtooth'
-        osc.frequency.setValueAtTime(180, t)
-        osc.frequency.exponentialRampToValueAtTime(65, t + 0.14)
-        gain.gain.setValueAtTime(0.45 * this.volume, t)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14)
-        osc.connect(gain)
-        gain.connect(this.masterGain)
-        osc.start(t)
-        osc.stop(t + 0.14)
+        // 普通利刃/弹幕受创
+        this.playNoise('white', 0.08, 'bandpass', 2400, 800, 0.35, 2.5)
+        this.playTone(220, 'sawtooth', 0.12, 0.45, 65)
       }
     } catch (e) {}
   },
+
+  // 3. 敌怪受击与多巴胺打击感系统 (刀肉入肉、碎甲破防、暴击大金鸣)
   hitEnemy(isCrit = false, weaponType = 'sword', isBoss = false) {
     this._lastHitRecord = { isCrit, weaponType, isBoss, count: ((this._lastHitRecord && this._lastHitRecord.count) || 0) + 1 }
     if (!this.enabled || isHeadless) return
@@ -734,93 +866,79 @@ const sound = {
 
     try {
       const t = this.ctx.currentTime
-      const pitchVar = 0.92 + Math.random() * 0.16
+      const pitchVar = 0.93 + Math.random() * 0.14
 
       if (isCrit) {
-        // --- 暴击裂甲多巴胺复合音 (高频破甲金鸣 + 沉闷低音轰击 + 灵光回响) ---
-        const oscHigh = this.ctx.createOscillator()
-        const gainHigh = this.ctx.createGain()
-        oscHigh.type = 'triangle'
-        oscHigh.frequency.setValueAtTime(1420 * pitchVar, t)
-        oscHigh.frequency.exponentialRampToValueAtTime(320 * pitchVar, t + 0.13)
-        gainHigh.gain.setValueAtTime(0.55 * this.volume, t)
-        gainHigh.gain.exponentialRampToValueAtTime(0.001, t + 0.13)
-        oscHigh.connect(gainHigh)
-        gainHigh.connect(this.masterGain)
-        oscHigh.start(t)
-        oscHigh.stop(t + 0.13)
+        // --- 暴击多巴胺玉振金鸣 (温润玉磬和声 + 沉浑重拳低频 + 柔和打击瞬态，彻底剔除尖锐刺耳刮擦) ---
+        // 1. 仙门温润玉磬 (Warm Jade Chime Harmonics - 587Hz D5 + 880Hz A5 + 1175Hz D6 纯净正弦波)
+        const jadeTones = [
+          { freq: 587.33 * pitchVar, endRatio: 0.98, gain: 0.36, dur: 0.16 }, // 宫音基底 D5，温润清亮
+          { freq: 880.00 * pitchVar, endRatio: 0.98, gain: 0.22, dur: 0.14 }, // 纯五度 A5，空灵共振
+          { freq: 1174.66 * pitchVar, endRatio: 0.98, gain: 0.10, dur: 0.10 } // 高八度微泛音 D6，轻盈点缀
+        ]
 
+        jadeTones.forEach(n => {
+          const osc = this.ctx.createOscillator()
+          const gain = this.ctx.createGain()
+          osc.type = 'sine'
+          osc.frequency.setValueAtTime(n.freq, t)
+          osc.frequency.exponentialRampToValueAtTime(Math.max(20, n.freq * n.endRatio), t + n.dur)
+
+          gain.gain.setValueAtTime(Math.max(0.0001, n.gain * this.volume), t)
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + n.dur)
+
+          osc.connect(gain)
+          gain.connect(this.masterGain)
+          osc.start(t)
+          osc.stop(t + n.dur)
+        })
+
+        // 2. 沉厚劲透重低音轰击 (Sub-bass Chest Thud: 纯正弦低频冲劲，去除锯齿波毛刺杂音)
         const oscLow = this.ctx.createOscillator()
         const gainLow = this.ctx.createGain()
-        oscLow.type = 'sawtooth'
-        oscLow.frequency.setValueAtTime(180 * pitchVar, t)
-        oscLow.frequency.exponentialRampToValueAtTime(36, t + 0.22)
-        gainLow.gain.setValueAtTime(0.65 * this.volume, t)
-        gainLow.gain.exponentialRampToValueAtTime(0.001, t + 0.22)
+        oscLow.type = 'sine'
+        oscLow.frequency.setValueAtTime(118 * pitchVar, t)
+        oscLow.frequency.exponentialRampToValueAtTime(38, t + 0.18)
+        gainLow.gain.setValueAtTime(Math.max(0.0001, 0.62 * this.volume), t)
+        gainLow.gain.exponentialRampToValueAtTime(0.0001, t + 0.18)
         oscLow.connect(gainLow)
         gainLow.connect(this.masterGain)
         oscLow.start(t)
-        oscLow.stop(t + 0.22)
+        oscLow.stop(t + 0.18)
 
-        const oscRing = this.ctx.createOscillator()
-        const gainRing = this.ctx.createGain()
-        oscRing.type = 'sine'
-        oscRing.frequency.setValueAtTime(880 * pitchVar, t + 0.015)
-        oscRing.frequency.linearRampToValueAtTime(1160 * pitchVar, t + 0.16)
-        gainRing.gain.setValueAtTime(0.001, t)
-        gainRing.gain.setValueAtTime(0.26 * this.volume, t + 0.015)
-        gainRing.gain.exponentialRampToValueAtTime(0.001, t + 0.16)
-        oscRing.connect(gainRing)
-        gainRing.connect(this.masterGain)
-        oscRing.start(t + 0.015)
-        oscRing.stop(t + 0.16)
+        // 3. 柔和打击瞬态 (Soft Snappy Transient: 粉红噪声低通滤波，彻底剔除尖锐刮擦与刺耳金属哨音)
+        this.playNoise('pink', 0.035, 'lowpass', 1200 * pitchVar, 360, 0.24, 1.0)
       } else {
-        // --- 普通命中打击音 (刀肉切割 / 钝击破甲 + 微低频打击感) ---
-        let startFreq = 500
-        let endFreq = 130
-        let waveType = 'sawtooth'
-
+        // --- 普通命中打击音 (刀肉切割 / 钝击破甲 / 仙法灵光) ---
         if (weaponType === 'hammer' || weaponType === 'ding' || isBoss) {
-          startFreq = 260
-          endFreq = 50
-          waveType = 'triangle'
+          // 重钝击破甲：重型金属碰撞 + 碎石震荡
+          this.playNoise('pink', 0.10, 'lowpass', 850 * pitchVar, 180, 0.38, 2.0)
+          this.playTone(190 * pitchVar, 'triangle', 0.14, 0.52 * (isBoss ? 1.2 : 1.0), 38)
+          this.playTone(85 * pitchVar, 'sine', 0.12, 0.42, 30)
         } else if (weaponType === 'fist' || weaponType === 'dragon_armor') {
-          startFreq = 340
-          endFreq = 80
-          waveType = 'square'
-        } else if (weaponType === 'staff' || weaponType === 'spell' || weaponType === 'robe') {
-          startFreq = 440
-          endFreq = 160
-          waveType = 'sine'
+          // 龙鳞拳劲：暗劲透体 + 爆破瞬态
+          this.playNoise('white', 0.05, 'bandpass', 1400 * pitchVar, 400, 0.32, 2.5)
+          this.playTone(320 * pitchVar, 'sawtooth', 0.10, 0.48, 65)
+          this.playTone(95 * pitchVar, 'sine', 0.08, 0.35, 36)
+        } else if (weaponType === 'thunder_sword') {
+          // 奔雷古剑：电芒爆破 + 剑刃入肉
+          this.playNoise('white', 0.06, 'highpass', 2800 * pitchVar, 1000, 0.34, 3.0)
+          this.playTone(620 * pitchVar, 'sawtooth', 0.09, 0.42, 140)
+        } else if (weaponType === 'staff' || weaponType === 'spell' || weaponType === 'robe' || weaponType === 'bagua' || weaponType === 'fuchen') {
+          // 仙道法器：灵韵震颤
+          this.playTone(520 * pitchVar, 'sine', 0.11, 0.36, 180)
+          this.playNoise('white', 0.07, 'bandpass', 2200 * pitchVar, 600, 0.22, 1.8)
+        } else {
+          // 剑刃切甲入肉：金属瞬态高频切削 + 短促肉质低频
+          this.playNoise('white', 0.04, 'bandpass', 3500 * pitchVar, 1400, 0.34, 4.0)
+          this.playTone(680 * pitchVar, 'sawtooth', 0.08, 0.40, 160 * pitchVar)
+          this.playTone(110 * pitchVar, 'sine', 0.06, 0.28, 42)
         }
-
-        const oscMain = this.ctx.createOscillator()
-        const gainMain = this.ctx.createGain()
-        oscMain.type = waveType
-        oscMain.frequency.setValueAtTime(startFreq * pitchVar, t)
-        oscMain.frequency.exponentialRampToValueAtTime(Math.max(25, endFreq * pitchVar), t + 0.08)
-        gainMain.gain.setValueAtTime((isBoss ? 0.48 : 0.38) * this.volume, t)
-        gainMain.gain.exponentialRampToValueAtTime(0.001, t + 0.08)
-        oscMain.connect(gainMain)
-        gainMain.connect(this.masterGain)
-        oscMain.start(t)
-        oscMain.stop(t + 0.08)
-
-        // 辅助肉质低频沉入感
-        const oscThump = this.ctx.createOscillator()
-        const gainThump = this.ctx.createGain()
-        oscThump.type = 'sine'
-        oscThump.frequency.setValueAtTime(115 * pitchVar, t)
-        oscThump.frequency.exponentialRampToValueAtTime(40, t + 0.06)
-        gainThump.gain.setValueAtTime(0.3 * this.volume, t)
-        gainThump.gain.exponentialRampToValueAtTime(0.001, t + 0.06)
-        oscThump.connect(gainThump)
-        gainThump.connect(this.masterGain)
-        oscThump.start(t)
-        oscThump.stop(t + 0.06)
       }
     } catch (e) {}
   },
+
+  // 4. 妖魔伏诛消散音效 (小怪轻灵化尘，精英/Boss沉浑陨落)
   defeat(isBoss = false, isElite = false) {
     if (!this.enabled || isHeadless) return
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
@@ -828,14 +946,19 @@ const sound = {
     this._lastDefeatSound = now
 
     if (isBoss || isElite) {
-      this.playTone(160, 'sawtooth', 0.35, 0.65, 30)
+      this.playNoise('pink', 0.42, 'lowpass', 850, 120, 0.62, 2.0)
+      this.playTone(150, 'sawtooth', 0.38, 0.68, 28)
       setTimeout(() => {
-        this.playTone(380, 'sine', 0.28, 0.45, 120)
-      }, 50)
+        this.playTone(523.25, 'sine', 0.35, 0.48, 261.63)
+        this.playTone(783.99, 'triangle', 0.28, 0.36, 392.00)
+      }, 60)
     } else {
-      this.playTone(320, 'sine', 0.16, 0.38, 540)
+      this.playNoise('white', 0.12, 'highpass', 2400, 600, 0.24, 2.0)
+      this.playTone(340, 'sine', 0.16, 0.36, 580)
     }
   },
+
+  // 5. 敌怪/领主弹幕攻击音效 (混沌道祖星刃/黑洞、金翅大鹏金羽/神雷)
   enemyShoot(type = 'default') {
     this._lastEnemyShoot = { type, time: Date.now() }
     if (!this.enabled || isHeadless) return
@@ -849,165 +972,499 @@ const sound = {
     this._lastEnemyShootTimes[type] = now
 
     try {
-      const t = this.ctx.currentTime
-      if (type === 'frost_crystal') {
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
-        osc.type = 'triangle'
-        osc.frequency.setValueAtTime(1050, t)
-        osc.frequency.exponentialRampToValueAtTime(360, t + 0.10)
-        gain.gain.setValueAtTime(0.34 * this.volume, t)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.10)
-        osc.connect(gain)
-        gain.connect(this.masterGain)
-        osc.start(t)
-        osc.stop(t + 0.10)
-      } else if (type === 'fireball' || type === 'magma') {
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
-        osc.type = 'sawtooth'
-        osc.frequency.setValueAtTime(240, t)
-        osc.frequency.exponentialRampToValueAtTime(80, t + 0.14)
-        gain.gain.setValueAtTime(0.38 * this.volume, t)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.14)
-        osc.connect(gain)
-        gain.connect(this.masterGain)
-        osc.start(t)
-        osc.stop(t + 0.14)
-      } else if (type === 'corpse_knuckle' || type === 'bonespike') {
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
-        osc.type = 'square'
-        osc.frequency.setValueAtTime(420, t)
-        osc.frequency.exponentialRampToValueAtTime(130, t + 0.08)
-        gain.gain.setValueAtTime(0.32 * this.volume, t)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.08)
-        osc.connect(gain)
-        gain.connect(this.masterGain)
-        osc.start(t)
-        osc.stop(t + 0.08)
-      } else if (type === 'asura_soul' || type === 'corpse_ghost_fire') {
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
-        osc.type = 'sine'
-        osc.frequency.setValueAtTime(520, t)
-        osc.frequency.exponentialRampToValueAtTime(220, t + 0.20)
-        gain.gain.setValueAtTime(0.36 * this.volume, t)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.20)
-        osc.connect(gain)
-        gain.connect(this.masterGain)
-        osc.start(t)
-        osc.stop(t + 0.20)
+      const pitchVar = 0.94 + Math.random() * 0.12
+      if (type === 'cosmic_blade') {
+        // 混沌道祖 · 太虚裂空星刃：拂丝空灵破风 + 银刃激射长啸
+        this.playNoise('white', 0.11, 'bandpass', 3600 * pitchVar, 950, 0.36, 4.0)
+        this.playTone(980 * pitchVar, 'triangle', 0.14, 0.38, 340)
       } else if (type === 'feather') {
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
-        osc.type = 'triangle'
-        osc.frequency.setValueAtTime(840, t)
-        osc.frequency.exponentialRampToValueAtTime(320, t + 0.09)
-        gain.gain.setValueAtTime(0.32 * this.volume, t)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09)
-        osc.connect(gain)
-        gain.connect(this.masterGain)
-        osc.start(t)
-        osc.stop(t + 0.09)
-      } else if (type === 'cosmic_blade') {
-        const osc = this.ctx.createOscillator()
-        const gain = this.ctx.createGain()
-        osc.type = 'sine'
-        osc.frequency.setValueAtTime(740, t)
-        osc.frequency.exponentialRampToValueAtTime(250, t + 0.15)
-        gain.gain.setValueAtTime(0.35 * this.volume, t)
-        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15)
-        osc.connect(gain)
-        gain.connect(this.masterGain)
-        osc.start(t)
-        osc.stop(t + 0.15)
+        // 金翅大鹏 · 太乙金羽：锐利翎羽破风激射
+        this.playNoise('white', 0.08, 'bandpass', 4200 * pitchVar, 1200, 0.34, 4.5)
+        this.playTone(880 * pitchVar, 'triangle', 0.09, 0.34, 320)
+      } else if (type === 'frost_crystal') {
+        this.playNoise('white', 0.07, 'highpass', 3200 * pitchVar, 1400, 0.30, 3.0)
+        this.playTone(1050 * pitchVar, 'triangle', 0.10, 0.34, 360)
+      } else if (type === 'fireball' || type === 'magma') {
+        this.playNoise('pink', 0.14, 'bandpass', 1100 * pitchVar, 320, 0.38, 2.0)
+        this.playTone(240 * pitchVar, 'sawtooth', 0.14, 0.38, 80)
+      } else if (type === 'corpse_knuckle' || type === 'bonespike') {
+        this.playNoise('white', 0.06, 'bandpass', 2200 * pitchVar, 800, 0.30, 3.5)
+        this.playTone(420 * pitchVar, 'square', 0.08, 0.32, 130)
+      } else if (type === 'asura_soul' || type === 'corpse_ghost_fire') {
+        this.playTone(520 * pitchVar, 'sine', 0.20, 0.36, 220)
+        this.playNoise('pink', 0.18, 'bandpass', 850 * pitchVar, 260, 0.22, 2.5)
       } else {
-        this.playTone(460, 'triangle', 0.11, 0.35, 160)
+        this.playNoise('white', 0.08, 'bandpass', 2400 * pitchVar, 700, 0.28, 2.0)
+        this.playTone(460 * pitchVar, 'triangle', 0.11, 0.35, 160)
       }
     } catch (e) {}
   },
+
+  // 6. 敌怪突刺与冲击波
   enemySlam(type = 'slam') {
     this._lastEnemySlam = { type, time: Date.now() }
     if (!this.enabled || isHeadless) return
     if (type === 'rush') {
-      this.playTone(150, 'sawtooth', 0.36, 0.65, 42)
+      // 太虚折跃 / 鹏程折跃：虚空撕裂超音速激波破空
+      this.playNoise('pink', 0.26, 'lowpass', 1200, 180, 0.58, 2.0)
+      this.playTone(160, 'sawtooth', 0.34, 0.65, 40)
     } else if (type === 'stomp') {
-      this.playTone(95, 'sawtooth', 0.26, 0.6, 32)
+      this.playNoise('pink', 0.24, 'lowpass', 650, 90, 0.52, 1.8)
+      this.playTone(95, 'sawtooth', 0.26, 0.60, 32)
     } else {
-      this.playTone(85, 'sawtooth', 0.32, 0.7, 28)
+      this.playNoise('pink', 0.30, 'lowpass', 800, 110, 0.62, 1.5)
+      this.playTone(85, 'sawtooth', 0.32, 0.70, 28)
     }
   },
+
+  // 7. 终极大招 AoE (天劫神雷、黑洞坍缩、大鹏神啼)
   enemyAoE(type = 'explosion') {
     this._lastEnemyAoE = { type, time: Date.now() }
     if (!this.enabled || isHeadless) return
-    if (type === 'blackhole_cast') {
-      this.playTone(120, 'sine', 0.35, 0.45, 90)
+    if (type === 'thunder_strike') {
+      // 九天玄刹神雷天劫！苍穹雷光电穿瞬间 + 天崩地裂滚雷
+      this.playNoise('white', 0.08, 'highpass', 3500, 1200, 0.55, 3.5)
+      this.playNoise('pink', 0.38, 'lowpass', 850, 120, 0.65, 2.5)
+      this.playTone(130, 'sawtooth', 0.36, 0.75, 26)
+    } else if (type === 'blackhole_cast') {
+      // 混沌归元太极黑洞！虚空双音异频脉冲引力吞噬
+      this.playTone(95, 'sine', 0.40, 0.45, 88)
+      this.playTone(102, 'sine', 0.40, 0.35, 96)
+      this.playNoise('pink', 0.35, 'bandpass', 450, 120, 0.38, 3.0)
+    } else if (type === 'screech') {
+      // 金翅大鹏裂帛啼鸣！穿云神鸟尖啸
+      this.playTone(1250, 'sine', 0.28, 0.52, 1850)
+      this.playTone(1650, 'triangle', 0.25, 0.42, 2200)
     } else if (type === 'laser') {
       this.playTone(620, 'sawtooth', 0.28, 0.48, 480)
+      this.playNoise('white', 0.25, 'bandpass', 1800, 600, 0.32, 3.0)
     } else {
+      this.playNoise('pink', 0.38, 'lowpass', 1100, 140, 0.72, 1.8)
       this.playTone(90, 'sawtooth', 0.42, 0.75, 22)
     }
   },
+
+  // 8. 场景与法宝经典动作音效
   slam() {
-    this.playTone(85, 'sawtooth', 0.28, 0.65, 35)
+    this.playNoise('pink', 0.26, 'lowpass', 700, 110, 0.55, 1.8)
+    this.playTone(90, 'sawtooth', 0.28, 0.65, 32)
   },
   crash() {
-    this.playTone(110, 'triangle', 0.35, 0.7, 45)
+    this.playNoise('pink', 0.28, 'lowpass', 950, 140, 0.58, 2.2)
+    this.playTone(120, 'triangle', 0.32, 0.68, 40)
   },
   dragon() {
-    this.playTone(220, 'sawtooth', 0.25, 0.55, 120)
+    // 狂龙出海：龙吟咆哮气浪
+    this.playNoise('pink', 0.28, 'bandpass', 1200, 240, 0.50, 2.5)
+    this.playTone(210, 'sawtooth', 0.28, 0.58, 85)
+    this.playTone(110, 'sawtooth', 0.24, 0.45, 45)
   },
   whirlwind() {
-    this.playTone(520, 'sine', 0.18, 0.45, 380)
+    this.playNoise('white', 0.18, 'bandpass', 3200, 900, 0.38, 3.0)
+    this.playTone(540, 'sine', 0.18, 0.42, 360)
   },
   fuchen() {
-    this.playTone(660, 'sine', 0.2, 0.4, 440)
+    this.playNoise('white', 0.16, 'bandpass', 1600, 450, 0.32, 2.0)
+    this.playTone(660, 'sine', 0.20, 0.38, 440)
   },
   bagua() {
-    this.playTone(440, 'triangle', 0.3, 0.45, 330)
+    this.playTone(523.25, 'sine', 0.32, 0.44, 392.00)
+    this.playTone(783.99, 'triangle', 0.25, 0.32, 523.25)
   },
   singularity() {
-    this.playTone(180, 'sine', 0.35, 0.5, 90)
+    this.playTone(92, 'sine', 0.38, 0.50, 84)
+    this.playTone(98, 'sine', 0.38, 0.40, 92)
+    this.playNoise('pink', 0.32, 'lowpass', 450, 110, 0.38, 2.5)
   },
   flame() {
-    this.playTone(260, 'sawtooth', 0.28, 0.5, 90)
+    this.playNoise('pink', 0.24, 'bandpass', 1200, 280, 0.48, 2.0)
+    this.playTone(240, 'sawtooth', 0.26, 0.50, 80)
   },
   pounce() {
-    this.playTone(740, 'triangle', 0.16, 0.5, 320)
+    this.playNoise('white', 0.14, 'bandpass', 2600, 800, 0.38, 2.5)
+    this.playTone(680, 'triangle', 0.16, 0.48, 280)
   },
   chainArc() {
-    this.playTone(720, 'sawtooth', 0.16, 0.45, 140)
+    this.playNoise('white', 0.12, 'highpass', 3500, 1400, 0.42, 4.0)
+    this.playTone(740, 'sawtooth', 0.15, 0.45, 160)
   },
   blazingBurst() {
     if (!this.enabled || isHeadless) return
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
     if (this._lastBlazingBurst && now - this._lastBlazingBurst < 65) return
     this._lastBlazingBurst = now
-    this.playTone(280, 'sawtooth', 0.32, 0.55, 55)
+    this.playNoise('pink', 0.28, 'lowpass', 1100, 160, 0.58, 2.0)
+    this.playTone(260, 'sawtooth', 0.30, 0.58, 50)
   },
   flameBrand() {
     if (!this.enabled || isHeadless) return
-    this.playTone(520, 'triangle', 0.12, 0.35, 260)
+    this.playNoise('pink', 0.14, 'bandpass', 1400, 420, 0.36, 2.5)
+    this.playTone(520, 'triangle', 0.12, 0.38, 240)
   },
+  whoosh() {
+    this.playNoise('pink', 0.16, 'bandpass', 1800, 480, 0.36, 2.2)
+  },
+  magic() {
+    this.playTone(880, 'sine', 0.22, 0.35, 1174.66)
+    this.playTone(1320, 'sine', 0.18, 0.25, 1760)
+  },
+  wail() {
+    this.playNoise('pink', 0.22, 'bandpass', 920, 320, 0.35, 3.0)
+    this.playTone(440, 'sine', 0.24, 0.35, 220)
+  },
+
+  // 9. 突破晋升 (正统五声音阶仙乐玉磬和弦：宫 C5 - 商 D5 - 角 E5 - 徵 G5 - 羽 A5 - 宫 C6)
   levelUp() {
     if (!this.enabled || isHeadless) return
-    const notes = [523.25, 659.25, 783.99, 1046.50]
+    const notes = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50]
     notes.forEach((f, idx) => {
       setTimeout(() => {
-        this.playTone(f, 'sine', 0.28, 0.45, f * 1.05)
-      }, idx * 75)
+        this.playTone(f, 'sine', 0.32, 0.42, f * 1.02)
+        this.playTone(f * 2, 'triangle', 0.18, 0.18, f * 2.02)
+      }, idx * 65)
     })
   },
+
+  // 10. 拾取反馈 (灵石清灵水滴，仙宝祥瑞金磬)
   pickup(isItem = false) {
     if (isItem) {
-      this.playTone(1174.66, 'sine', 0.22, 0.5, 1318.51)
+      this.playTone(1174.66, 'sine', 0.24, 0.45, 1318.51)
+      this.playTone(1760.00, 'sine', 0.18, 0.28, 1975.53)
     } else {
-      this.playTone(698.46, 'triangle', 0.08, 0.35, 880)
+      this.playTone(880.00, 'sine', 0.08, 0.32, 1174.66)
     }
   },
+
+  // 11. 界面操作点选 (温润玉石敲击)
   click() {
-    this.playTone(587.33, 'sine', 0.06, 0.3, 440)
+    this.playTone(784, 'triangle', 0.05, 0.28, 523.25)
+  },
+
+  // 12. 战意国风仙乐引擎 (BGM System - 《问鼎太虚 · 碧血仙戈》)
+  bgm: {
+    enabled: true,
+    volume: 0.5,
+    playing: false,
+    ctx: null,
+    bgmGain: null,
+    bpm: 92,
+    targetBpm: 92,
+    intensity: 'normal',
+    currentStep: 0,
+    nextStepTime: 0,
+    scheduleAheadTime: 0.15,
+
+    // 仙侠五音调式定音表（D羽调式）
+    NOTES: {
+      D2: 73.42, A2: 110.00,
+      D3: 146.83, F3: 174.61, G3: 196.00, A3: 220.00, C4: 261.63,
+      D4: 293.66, F4: 349.23, G4: 392.00, A4: 440.00, C5: 523.25,
+      D5: 587.33, F5: 698.46, G5: 783.99, A5: 880.00, C6: 1046.50,
+      D6: 1174.66
+    },
+
+    init(ctx, parentGain) {
+      if (this.bgmGain || !ctx) return
+      this.ctx = ctx
+      try {
+        this.bgmGain = ctx.createGain()
+        this.bgmGain.gain.setValueAtTime(this.enabled ? this.volume : 0.0001, ctx.currentTime)
+        if (parentGain) {
+          this.bgmGain.connect(parentGain)
+        } else {
+          this.bgmGain.connect(ctx.destination)
+        }
+      } catch (e) {
+        console.warn('BGM init failed', e)
+      }
+    },
+
+    setVolume(val) {
+      this.volume = Math.max(0, Math.min(1.0, Number(val) || 0))
+      if (this.bgmGain && this.ctx) {
+        try {
+          const t = this.ctx.currentTime
+          this.bgmGain.gain.cancelScheduledValues(t)
+          const target = this.enabled ? Math.max(0.0001, this.volume) : 0.0001
+          this.bgmGain.gain.linearRampToValueAtTime(target, t + 0.05)
+        } catch (_) {}
+      }
+    },
+
+    toggle() {
+      this.enabled = !this.enabled
+      if (this.bgmGain && this.ctx) {
+        try {
+          const t = this.ctx.currentTime
+          this.bgmGain.gain.cancelScheduledValues(t)
+          const target = this.enabled ? Math.max(0.0001, this.volume) : 0.0001
+          this.bgmGain.gain.linearRampToValueAtTime(target, t + 0.08)
+        } catch (_) {}
+      }
+      return this.enabled
+    },
+
+    play() {
+      this.playing = true
+      if (typeof sound !== 'undefined') {
+        sound.init()
+        sound.resume()
+        if (!this.ctx && sound.ctx) {
+          this.init(sound.ctx, sound.masterGain)
+        }
+      }
+      if (this.ctx) {
+        this.nextStepTime = this.ctx.currentTime + 0.05
+      }
+    },
+
+    pause() {
+      this.playing = false
+    },
+
+    stop() {
+      this.playing = false
+      this.currentStep = 0
+    },
+
+    setIntensity(level) {
+      if (this.intensity === level) return
+      this.intensity = level
+      this.targetBpm = level === 'boss' ? 124 : 92
+    },
+
+    update(dt, g) {
+      if (!this.playing) return
+
+      const isBoss = !!(g && (g.isBossStage || (g.boss && g.boss.hp > 0) || g.primordialGodTriggered || (g.enemies && g.enemies.some(e => e.isBoss && e.hp > 0))))
+      this.setIntensity(isBoss ? 'boss' : 'normal')
+
+      if (this.bpm !== this.targetBpm) {
+        const step = (this.targetBpm - this.bpm) * Math.min(1, dt * 3.0)
+        if (Math.abs(this.targetBpm - this.bpm) < 0.5) {
+          this.bpm = this.targetBpm
+        } else {
+          this.bpm += step
+        }
+      }
+
+      if (!this.ctx || this.ctx.state === 'suspended') return
+
+      const currentTime = this.ctx.currentTime
+      if (this.nextStepTime < currentTime - 0.5) {
+        this.nextStepTime = currentTime + 0.02
+      }
+
+      const stepDuration = 60 / this.bpm / 4
+      while (this.nextStepTime < currentTime + this.scheduleAheadTime) {
+        this._scheduleStep(this.currentStep, this.nextStepTime)
+        this.nextStepTime += stepDuration
+        this.currentStep = (this.currentStep + 1) % 64
+      }
+    },
+
+    _playDrum(time, isHeavy = false, isRoll = false) {
+      if (!this.ctx || !this.bgmGain) return
+      try {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        const startFreq = isHeavy ? 165 : (isRoll ? 130 : 145)
+        const endFreq = isHeavy ? 42 : 50
+        const dur = isHeavy ? 0.28 : (isRoll ? 0.12 : 0.20)
+        const amp = (isHeavy ? 0.65 : (isRoll ? 0.35 : 0.48)) * this.volume
+
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(startFreq, time)
+        osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), time + dur)
+
+        gain.gain.setValueAtTime(Math.max(0.0001, amp), time)
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + dur)
+
+        osc.connect(gain)
+        gain.connect(this.bgmGain)
+        osc.start(time)
+        osc.stop(time + dur)
+      } catch (_) {}
+    },
+
+    _playGuzheng(freq, time, vel = 0.26) {
+      if (!this.ctx || !this.bgmGain || !freq) return
+      try {
+        const osc1 = this.ctx.createOscillator()
+        const osc2 = this.ctx.createOscillator()
+        const filter = this.ctx.createBiquadFilter()
+        const gain = this.ctx.createGain()
+        const dur = 0.32
+        const amp = vel * this.volume
+
+        osc1.type = 'triangle'
+        osc1.frequency.setValueAtTime(freq, time)
+        osc2.type = 'sine'
+        osc2.frequency.setValueAtTime(freq * 2, time)
+
+        filter.type = 'lowpass'
+        filter.frequency.setValueAtTime(2600, time)
+        filter.frequency.exponentialRampToValueAtTime(450, time + dur)
+
+        gain.gain.setValueAtTime(Math.max(0.0001, amp), time)
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + dur)
+
+        osc1.connect(filter)
+        osc2.connect(filter)
+        filter.connect(gain)
+        gain.connect(this.bgmGain)
+
+        osc1.start(time)
+        osc2.start(time)
+        osc1.stop(time + dur)
+        osc2.stop(time + dur)
+      } catch (_) {}
+    },
+
+    _playFlute(freq, time, dur = 0.38, vel = 0.24) {
+      if (!this.ctx || !this.bgmGain || !freq) return
+      try {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        const amp = vel * this.volume
+
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, time)
+        osc.frequency.linearRampToValueAtTime(freq * 1.008, time + dur * 0.5)
+        osc.frequency.linearRampToValueAtTime(freq, time + dur)
+
+        const attack = Math.min(0.06, dur * 0.2)
+        gain.gain.setValueAtTime(0.0001, time)
+        gain.gain.linearRampToValueAtTime(Math.max(0.0001, amp), time + attack)
+        gain.gain.setValueAtTime(Math.max(0.0001, amp), time + dur - 0.06)
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + dur)
+
+        osc.connect(gain)
+        gain.connect(this.bgmGain)
+
+        osc.start(time)
+        osc.stop(time + dur)
+      } catch (_) {}
+    },
+
+    _playGong(time) {
+      if (!this.ctx || !this.bgmGain) return
+      try {
+        const baseFreq = this.NOTES.D4
+        const ratios = [1.0, 1.51, 2.72, 4.18]
+        const gains = [0.22, 0.14, 0.08, 0.05]
+        const dur = 1.6
+
+        ratios.forEach((r, idx) => {
+          const osc = this.ctx.createOscillator()
+          const gain = this.ctx.createGain()
+          const amp = gains[idx] * this.volume
+
+          osc.type = 'sine'
+          osc.frequency.setValueAtTime(baseFreq * r, time)
+
+          gain.gain.setValueAtTime(Math.max(0.0001, amp), time)
+          gain.gain.exponentialRampToValueAtTime(0.0001, time + dur)
+
+          osc.connect(gain)
+          gain.connect(this.bgmGain)
+
+          osc.start(time)
+          osc.stop(time + dur)
+        })
+      } catch (_) {}
+    },
+
+    _playDrone(freq, time, dur = 1.6) {
+      if (!this.ctx || !this.bgmGain || !freq) return
+      try {
+        const osc = this.ctx.createOscillator()
+        const gain = this.ctx.createGain()
+        const amp = 0.16 * this.volume
+
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(freq, time)
+
+        gain.gain.setValueAtTime(0.0001, time)
+        gain.gain.linearRampToValueAtTime(Math.max(0.0001, amp), time + 0.15)
+        gain.gain.setValueAtTime(Math.max(0.0001, amp), time + dur - 0.2)
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + dur)
+
+        osc.connect(gain)
+        gain.connect(this.bgmGain)
+
+        osc.start(time)
+        osc.stop(time + dur)
+      } catch (_) {}
+    },
+
+    _scheduleStep(step, time) {
+      const N = this.NOTES
+      const isBoss = this.intensity === 'boss'
+
+      // 1. 道家编钟/神圣大磬 (每 32 步宏大定场)
+      if (step === 0 || step === 32) {
+        this._playGong(time)
+      }
+
+      // 2. 太虚低频衬底 (每 16 步转调铺底)
+      if (step === 0) this._playDrone(N.D2, time, 2.2)
+      else if (step === 16) this._playDrone(N.A2, time, 2.2)
+      else if (step === 32) this._playDrone(N.D2, time, 2.2)
+      else if (step === 48) this._playDrone(N.G2 || 98.0, time, 2.2)
+
+      // 3. 大堂战鼓
+      if (isBoss) {
+        const rollSteps = [0, 2, 4, 6, 8, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26, 27, 28, 30, 32, 34, 36, 38, 40, 42, 43, 44, 46, 48, 50, 52, 54, 56, 58, 59, 60, 62]
+        if (rollSteps.includes(step)) {
+          const isAccent = (step % 8 === 0)
+          this._playDrum(time, isAccent, !isAccent)
+        }
+      } else {
+        if (step % 8 === 0) {
+          this._playDrum(time, true, false)
+        } else if (step % 8 === 6 || step === 12 || step === 28 || step === 44 || step === 60) {
+          this._playDrum(time, false, true)
+        }
+      }
+
+      // 4. 古筝流水轮指 (64步瀑布式五声音阶)
+      const guzhengPattern = [
+        N.D3, N.F3, N.A3, N.D4, N.F4, N.A4, N.D5, N.A4, N.F4, N.D4, N.A3, N.F3, N.D3, N.F3, N.A3, N.C4,
+        N.G3, N.A3, N.C4, N.D4, N.G4, N.A4, N.C5, N.A4, N.G4, N.D4, N.C4, N.A3, N.G3, N.A3, N.C4, N.D4,
+        N.F3, N.A3, N.C4, N.D4, N.F4, N.A4, N.C5, N.D5, N.C5, N.A4, N.F4, N.D4, N.C4, N.A3, N.F3, N.A3,
+        N.G3, N.A3, N.C4, N.D4, N.F4, N.G4, N.A4, N.C5, N.D5, N.C5, N.A4, N.G4, N.F4, N.D4, N.C4, N.D4
+      ]
+      if (guzhengPattern[step]) {
+        const vel = (step % 4 === 0) ? 0.30 : (step % 2 === 0 ? 0.22 : 0.16)
+        this._playGuzheng(guzhengPattern[step], time, isBoss ? vel * 1.15 : vel)
+      }
+
+      // 5. 竹笛主旋律 (高亢空灵叙事)
+      const fluteMap = {
+        0: { f: N.D5, d: 0.65 },
+        6: { f: N.F5, d: 0.32 },
+        8: { f: N.G5, d: 0.65 },
+        12: { f: N.A5, d: 0.65 },
+        16: { f: N.C6, d: 0.50 },
+        20: { f: N.A5, d: 0.65 },
+        26: { f: N.G5, d: 0.32 },
+        28: { f: N.F5, d: 0.65 },
+        32: { f: N.D5, d: 0.50 },
+        36: { f: N.G5, d: 0.50 },
+        40: { f: N.A5, d: 0.65 },
+        44: { f: N.C6, d: 0.65 },
+        48: { f: N.D6, d: 0.85 },
+        54: { f: N.C6, d: 0.50 },
+        58: { f: N.A5, d: 0.50 },
+        62: { f: N.D5, d: 0.40 }
+      }
+      if (fluteMap[step]) {
+        const item = fluteMap[step]
+        const durSec = item.d * (60 / this.bpm)
+        this._playFlute(item.f, time, durSec, isBoss ? 0.32 : 0.26)
+      }
+    }
   }
 }
 
@@ -2119,7 +2576,7 @@ function executeWeaponAttack(target, angleOffset = 0, damage = game.attack, colo
       hitEnemies: new Set(),
       color: '#ff7b30'
     })
-    if (!isHeadless) sound.shoot?.()
+    if (!isHeadless) sound.shoot?.('hammer')
     return
   }
 
@@ -2152,7 +2609,7 @@ function executeWeaponAttack(target, angleOffset = 0, damage = game.attack, colo
       hitEnemies: new Set(),
       color: '#e69848'
     })
-    if (!isHeadless) sound.shoot?.()
+    if (!isHeadless) sound.shoot?.('ding')
     return
   }
 
@@ -2300,7 +2757,7 @@ function executeWeaponAttack(target, angleOffset = 0, damage = game.attack, colo
       size: 46,
       trail: []
     })
-    if (!isHeadless) sound.shoot?.()
+    if (!isHeadless) sound.shoot?.('thunder_sword')
     return
   }
 
@@ -2332,7 +2789,7 @@ function executeWeaponAttack(target, angleOffset = 0, damage = game.attack, colo
       size: 44,
       trail: []
     })
-    if (!isHeadless) sound.shoot?.()
+    if (!isHeadless) sound.shoot?.('sword')
     return
   }
 
@@ -2637,7 +3094,7 @@ function shootClassic(target, angleOffset = 0, damage = game.attack, color = '#e
   if (!isHeadless) {
     const now = performance.now()
     if (!game._lastShootSfx || now - game._lastShootSfx > 100) {
-      sound.shoot()
+      sound.shoot(wType)
       game._lastShootSfx = now
     }
   }
@@ -11882,6 +12339,8 @@ function dispatchGamepadUIEvents(pad, justPressed, navLeft, navRight, navUp, nav
   if (modalSettings && !modalSettings.classList.contains('hidden')) {
     const settingsSelectors = [
       '#sound-toggle',
+      '#bgm-toggle',
+      '#bgm-slider',
       '#volume-slider',
       '#btn-test-sound',
       '#btn-toggle-rumble',
@@ -11936,9 +12395,31 @@ function dispatchGamepadUIEvents(pad, justPressed, navLeft, navRight, navUp, nav
         try { Object.defineProperty(evtChange, 'target', { value: curEl }) } catch (e) { evtChange.target = curEl }
         curEl.dispatchEvent(evtChange)
       }
+    } else if (curSel === '#bgm-slider' && curEl) {
+      if (navLeft) {
+        const curVal = Number(curEl.value) || 0
+        const nextVal = Math.max(0, curVal - 5)
+        curEl.value = nextVal
+        const evtInput = new Event('input', { bubbles: true })
+        try { Object.defineProperty(evtInput, 'target', { value: curEl }) } catch (e) { evtInput.target = curEl }
+        curEl.dispatchEvent(evtInput)
+        const evtChange = new Event('change', { bubbles: true })
+        try { Object.defineProperty(evtChange, 'target', { value: curEl }) } catch (e) { evtChange.target = curEl }
+        curEl.dispatchEvent(evtChange)
+      } else if (navRight) {
+        const curVal = Number(curEl.value) || 0
+        const nextVal = Math.min(100, curVal + 5)
+        curEl.value = nextVal
+        const evtInput = new Event('input', { bubbles: true })
+        try { Object.defineProperty(evtInput, 'target', { value: curEl }) } catch (e) { evtInput.target = curEl }
+        curEl.dispatchEvent(evtInput)
+        const evtChange = new Event('change', { bubbles: true })
+        try { Object.defineProperty(evtChange, 'target', { value: curEl }) } catch (e) { evtChange.target = curEl }
+        curEl.dispatchEvent(evtChange)
+      }
     } else if (navLeft || navRight) {
       // 对开关类按钮，按左右也可触发切换
-      if (curSel === '#sound-toggle' || curSel === '#btn-toggle-rumble' || curSel === '#btn-toggle-float-num' || curSel === '#btn-toggle-fullscreen') {
+      if (curSel === '#sound-toggle' || curSel === '#bgm-toggle' || curSel === '#btn-toggle-rumble' || curSel === '#btn-toggle-float-num' || curSel === '#btn-toggle-fullscreen') {
         if (curEl) curEl.click()
       }
     }
@@ -14587,6 +15068,9 @@ function confirmSettlement() {
 function endRun() {
   game.gameOver = true
   game.paused = true
+  if (sound.bgm && typeof sound.bgm.stop === 'function') {
+    sound.bgm.stop()
+  }
   game.settlement = null
   game.player.invuln = 0
   game.specialAttacks = []
@@ -16611,6 +17095,9 @@ function frame(now) {
   game.last = now
   try {
     if (typeof pollGamepad === 'function') pollGamepad(dt)
+    if (sound.bgm && typeof sound.bgm.update === 'function') {
+      sound.bgm.update(dt, game)
+    }
     update(dt)
     draw()
   } catch (err) {
@@ -16681,6 +17168,17 @@ function showScreen(screenId) {
     if (typeof weaponOrbitAnimId !== 'undefined' && weaponOrbitAnimId) {
       cancelAnimationFrame(weaponOrbitAnimId)
       weaponOrbitAnimId = null
+    }
+  }
+
+  // 战意音乐屏幕生命周期联动
+  if (screenId === 'game') {
+    if (sound.bgm && sound.enabled && sound.bgm.enabled) {
+      sound.bgm.play()
+    }
+  } else {
+    if (sound.bgm) {
+      sound.bgm.stop()
     }
   }
 }
@@ -16785,10 +17283,12 @@ function togglePause(forced) {
   game.paused = next
 
   if (game.paused) {
+    if (sound.bgm && typeof sound.bgm.pause === 'function') sound.bgm.pause()
     renderPausePanel()
     openModal('modal-pause')
   } else {
     closeModal('modal-pause')
+    if (sound.bgm && sound.enabled && sound.bgm.enabled && game.screen === 'game') sound.bgm.play()
   }
 }
 
@@ -17735,6 +18235,32 @@ if (btnToggleFs) {
         document.exitFullscreen?.().catch?.(() => {})
         btnToggleFs.textContent = '切换全屏显示'
       }
+    }
+  })
+}
+
+const bgmSlider = document.querySelector('#bgm-slider')
+const bgmText = document.querySelector('#bgm-value')
+if (bgmSlider) {
+  bgmSlider.addEventListener('input', (e) => {
+    const val = Number(e.target.value)
+    if (sound.bgm) sound.bgm.setVolume(val / 100)
+    if (bgmText) bgmText.textContent = val + '%'
+  })
+  bgmSlider.addEventListener('change', () => {
+    sound.click()
+  })
+}
+
+if (ui.bgmToggle) {
+  ui.bgmToggle.addEventListener('click', () => {
+    const isEnabled = sound.bgm ? sound.bgm.toggle() : false
+    ui.bgmToggle.classList.toggle('muted', !isEnabled)
+    if (ui.bgmIcon) ui.bgmIcon.textContent = isEnabled ? '🎵' : '🔇'
+    if (ui.bgmText) ui.bgmText.textContent = isEnabled ? '开启' : '关闭'
+    sound.click()
+    if (isEnabled && sound.enabled && typeof game !== 'undefined' && game.screen === 'game' && !game.paused && !game.gameOver) {
+      sound.bgm.play()
     }
   })
 }

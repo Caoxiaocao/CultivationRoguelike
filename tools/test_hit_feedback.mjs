@@ -96,9 +96,28 @@ class MockDynamicsCompressorNode extends MockAudioNode {
   }
 }
 
+class MockBiquadFilterNode extends MockAudioNode {
+  constructor() {
+    super()
+    this.type = 'lowpass'
+    this.frequency = new MockAudioParam(1000)
+    this.Q = new MockAudioParam(1)
+  }
+}
+
+class MockAudioBufferSourceNode extends MockAudioNode {
+  constructor() {
+    super()
+    this.buffer = null
+  }
+  start() {}
+  stop() {}
+}
+
 class MockAudioContext {
   constructor() {
     this.currentTime = 0.1
+    this.sampleRate = 44100
     this.state = 'running'
     this.destination = new MockAudioNode()
     this.createdOscillators = []
@@ -116,6 +135,17 @@ class MockAudioContext {
   }
   createDynamicsCompressor() {
     return new MockDynamicsCompressorNode()
+  }
+  createBiquadFilter() {
+    return new MockBiquadFilterNode()
+  }
+  createBuffer(channels, length, sampleRate) {
+    return {
+      getChannelData() { return new Float32Array(length) }
+    }
+  }
+  createBufferSource() {
+    return new MockAudioBufferSourceNode()
   }
   resume() {
     this.state = 'running'
@@ -245,6 +275,40 @@ sound.defeat(false, false)
 assert(true, '普通小怪伏诛轻灵升散音效触发正常')
 sound.defeat(false, true)
 assert(true, '精英怪伏诛沉浑爆裂音效触发正常')
+
+// 1.7 高保真程序化噪声与动态滤波引擎验证
+assert(Boolean(sound.whiteNoiseBuffer), '白噪声专用 AudioBuffer 预生成就绪')
+assert(Boolean(sound.pinkNoiseBuffer), '粉红噪声 (Voss-McCartney) AudioBuffer 预生成就绪')
+assert(typeof sound.playNoise === 'function', '动态滤波噪声生成器 playNoise 已就绪')
+assert(typeof sound.whoosh === 'function', '凌空飞渡破虚轻啸 sound.whoosh 已就绪')
+assert(typeof sound.magic === 'function', '仙道法韵回响 sound.magic 已就绪')
+assert(typeof sound.wail === 'function', '幽冥鬼哭音煞 sound.wail 已就绪')
+
+// 1.8 武器出招与法宝破空音效多态适配
+sound.shoot('sword')
+sound.shoot('thunder_sword')
+sound.shoot('hammer')
+sound.shoot('ding')
+sound.shoot('dragon_armor')
+sound.shoot('bagua')
+sound.shoot('fuchen')
+sound.shoot('flame')
+assert(true, '八大武器专属出招破空与法宝音效调用正常')
+
+// 1.9 领主终极大招音效机制 (神雷天劫、黑洞引力、大鹏神啼)
+sound.enemyAoE('thunder_strike')
+assert(sound._lastEnemyAoE && sound._lastEnemyAoE.type === 'thunder_strike', '九天玄刹神雷天劫音效记录正常')
+sound.enemyAoE('blackhole_cast')
+assert(sound._lastEnemyAoE && sound._lastEnemyAoE.type === 'blackhole_cast', '混沌太极黑洞引力坍缩音效记录正常')
+sound.enemyAoE('screech')
+assert(sound._lastEnemyAoE && sound._lastEnemyAoE.type === 'screech', '金翅大鹏裂帛神啼音效记录正常')
+
+// 1.10 五声音阶突破与仙家拾取交互
+sound.levelUp()
+sound.pickup(true)
+sound.pickup(false)
+sound.click()
+assert(true, '五声音阶升级仙乐与灵石/仙宝拾取反馈触发正常')
 
 console.log('\n--- 2. 验证受击物理微击退与霸体防线机制 ---')
 game.player.x = 400
@@ -442,6 +506,56 @@ assert(sound._lastPlayerHurt && sound._lastPlayerHurt.hitType === 'explosion', '
 sound._lastPlayerHurt = null
 gc.sound.playerHurt('dot')
 assert(sound._lastPlayerHurt && sound._lastPlayerHurt.hitType === 'dot', '玩家受地火/毒沼持续伤害派发微弱滋滋音效')
+
+/* ---------- 8. 战意国风仙乐引擎 (BGM System) 单元与自适应测试 ---------- */
+console.log('\n--- 8. 战意国风仙乐引擎 (BGM System) 单元与自适应测试 ---')
+assert(gc.sound.bgm && typeof gc.sound.bgm === 'object', 'BGM 引擎对象正确挂载在 sound.bgm')
+assert(typeof gc.sound.bgm.init === 'function', 'BGM 具备 init 初始化方法')
+assert(typeof gc.sound.bgm.play === 'function', 'BGM 具备 play 播放方法')
+assert(typeof gc.sound.bgm.pause === 'function', 'BGM 具备 pause 暂停方法')
+assert(typeof gc.sound.bgm.stop === 'function', 'BGM 具备 stop 停止方法')
+assert(typeof gc.sound.bgm.setVolume === 'function', 'BGM 具备 setVolume 调节音量方法')
+assert(typeof gc.sound.bgm.toggle === 'function', 'BGM 具备 toggle 开关切换方法')
+assert(typeof gc.sound.bgm.update === 'function', 'BGM 具备 update 黄金时间调度器方法')
+
+// 初始化与默认参数
+gc.sound.bgm.init(gc.sound.ctx, gc.sound.masterGain)
+assert(gc.sound.bgm.bgmGain !== null, 'BGM 独立增益节点 bgmGain 初始化成功')
+assert(gc.sound.bgm.bpm === 92, 'BGM 初始节拍为 92 BPM')
+assert(gc.sound.bgm.intensity === 'normal', 'BGM 初始强度为 normal')
+
+// 音量与开关测试
+gc.sound.bgm.setVolume(0.75)
+assert(gc.sound.bgm.volume === 0.75, 'BGM 音量成功调节为 0.75')
+const toggledOff = gc.sound.bgm.toggle()
+assert(toggledOff === false && gc.sound.bgm.enabled === false, 'BGM toggle 成功关闭')
+const toggledOn = gc.sound.bgm.toggle()
+assert(toggledOn === true && gc.sound.bgm.enabled === true, 'BGM toggle 成功开启')
+
+// 调度与播放测试
+gc.sound.bgm.play()
+assert(gc.sound.bgm.playing === true, 'BGM 启动播放状态')
+
+// 常规战斗更新
+for (let i = 0; i < 20; i++) {
+  if (gc.sound.ctx) gc.sound.ctx.currentTime += 0.033
+  gc.sound.bgm.update(0.033, { isBossStage: false })
+}
+assert(gc.sound.bgm.intensity === 'normal', '小怪战斗保持 normal 强度')
+
+// Boss 战自适应提速
+for (let i = 0; i < 30; i++) {
+  if (gc.sound.ctx) gc.sound.ctx.currentTime += 0.033
+  gc.sound.bgm.update(0.033, { isBossStage: true, boss: { hp: 500 } })
+}
+assert(gc.sound.bgm.intensity === 'boss', 'Boss 战自动切换至 boss 紧张强度')
+assert(gc.sound.bgm.bpm > 92, 'Boss 战节拍动态加速向 124 BPM 爬升')
+
+// 暂停与停止
+gc.sound.bgm.pause()
+assert(gc.sound.bgm.playing === false, 'BGM 暂停成功')
+gc.sound.bgm.stop()
+assert(gc.sound.bgm.playing === false && gc.sound.bgm.currentStep === 0, 'BGM 停止并重置步序计数')
 
 console.log('\n====================================================')
 console.log(`测试结果统计: ${passed} 通过, ${failed} 失败`)
