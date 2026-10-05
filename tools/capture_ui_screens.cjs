@@ -21,6 +21,7 @@ app.whenReady().then(async () => {
     },
   })
   win.webContents.setFrameRate(60)
+  win.setSize(1280, 720)
 
   try {
     await win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
@@ -68,14 +69,28 @@ app.whenReady().then(async () => {
     await saveShot('4_codex_screen')
 
     // 5. In-Game Combat & HUD
-    await win.webContents.executeJavaScript(`(() => {
+    const gameMetrics = await win.webContents.executeJavaScript(`(() => {
       window.__gameControls.setChar(0, 0)
       window.__gameControls.startRunFromSelection()
       // Trigger boss telegraph banner for showcase
       if (window.__gameControls.showBossTelegraph) {
         window.__gameControls.showBossTelegraph('万骨噬魂阵', '九幽死气凝聚，幽冥黑洞即将撕裂！')
       }
+      const c = document.querySelector('#game')
+      const vp = document.querySelector('.game-viewport')
+      const sc = document.querySelector('.screen-game')
+      return {
+        winW: window.innerWidth,
+        winH: window.innerHeight,
+        canvasRect: c ? c.getBoundingClientRect() : null,
+        canvasObjectFit: c ? getComputedStyle(c).objectFit : null,
+        canvasWidthAttr: c ? c.width : null,
+        canvasHeightAttr: c ? c.height : null,
+        viewportRect: vp ? vp.getBoundingClientRect() : null,
+        screenRect: sc ? sc.getBoundingClientRect() : null,
+      }
     })()`)
+    console.log('GAME CANVAS METRICS:', JSON.stringify(gameMetrics, null, 2))
     await sleep(600)
     await saveShot('5_combat_hud')
 

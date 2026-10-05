@@ -19,7 +19,7 @@ function createWindow() {
     useContentSize: true,
     center: true,
     title: '问道 · 青冥秘境',
-    backgroundColor: '#060b0e',
+    backgroundColor: '#1c1a17',
     autoHideMenuBar: true,
     show: false, // 准备好后再平滑呈现，杜绝白屏闪烁
     webPreferences: {

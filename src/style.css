@@ -1079,7 +1079,7 @@ button { font: inherit; }
   display: block;
   width: 100vw;
   height: 100vh;
-  object-fit: contain;
+  object-fit: cover;
   background: #23201b;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: auto;
