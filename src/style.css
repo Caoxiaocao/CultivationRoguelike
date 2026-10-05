@@ -1061,7 +1061,7 @@ button { font: inherit; }
 .screen-game {
   width: 100vw;
   height: 100vh;
-  background: #101518;
+  background: #1c1a17; /* 焦墨古道底色 */
   overflow: hidden;
   position: relative;
 }
@@ -1080,7 +1080,7 @@ button { font: inherit; }
   width: 100vw;
   height: 100vh;
   object-fit: contain;
-  background: #12181b;
+  background: #23201b;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: auto;
 }

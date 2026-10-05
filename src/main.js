@@ -15034,12 +15034,10 @@ function drawFloatingWeapons(p, weapons, elapsedVal) {
 function drawBackground() {
   if (mapLoaded && mapImg) {
     ctx.drawImage(mapImg, 0, 0, ARENA_WIDTH, ARENA_HEIGHT)
-    ctx.fillStyle = 'rgba(10, 16, 20, 0.45)'
-    ctx.fillRect(0, 0, ARENA_WIDTH, ARENA_HEIGHT)
   } else {
-    ctx.fillStyle = '#0c1618'
+    ctx.fillStyle = '#e8dec9'
     ctx.fillRect(0, 0, ARENA_WIDTH, ARENA_HEIGHT)
-    ctx.strokeStyle = '#142528'
+    ctx.strokeStyle = 'rgba(140, 120, 95, 0.25)'
     ctx.lineWidth = 1
     for (let x = 0; x < ARENA_WIDTH; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ARENA_HEIGHT); ctx.stroke() }
     for (let y = 0; y < ARENA_HEIGHT; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(ARENA_WIDTH, y); ctx.stroke() }
